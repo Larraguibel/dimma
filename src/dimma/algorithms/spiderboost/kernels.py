@@ -1,0 +1,158 @@
+"""Private SpiderBoost step kernels (Algorithm 2 of Arora et al., ICML 2023).
+
+This module contains only the mathematical kernels for one anchor step
+and one variation step. Subsampling, clipping decisions, and the outer
+loop live elsewhere. The factory pattern (``make_anchor_step``,
+``make_variation_step``) takes a per-sample gradient function and returns
+a step kernel closed over it; the resulting kernel is suitable for
+``jax.jit`` at the call site.
+
+Reference
+---------
+R. Arora, R. Bassily, T. González, C. Guzmán, M. Menart, E. Ullah,
+"Faster Rates of Convergence to Stationary Points in Differentially
+Private Optimization", *Proceedings of the 40th International Conference
+on Machine Learning*, 2023.
+
+Extracted from ``private_spider_boost_criteo/src/private_spiderboost.py``
+without modification, save for import paths.
+"""
+
+from __future__ import annotations
+
+from typing import Any, NamedTuple
+
+import jax
+import jax.numpy as jnp
+
+from dimma.core.pytree import (
+    pytree_global_norm,
+    pytree_sub,
+    pytree_add,
+    pytree_scale,
+    pytree_sum_over_batch,
+)
+from dimma.core.clipping import per_sample_clip, per_sample_apply_mask
+from dimma.core.noise import add_pytree_gaussian_noise
+
+
+class StepOutput(NamedTuple):
+    """Return value of one SpiderBoost step.
+
+    Attributes
+    ----------
+    grad_estimate : pytree
+        New running gradient estimate ``∇_t``.
+    grad_norm : jax.Array, shape ()
+        Global ``l_2`` norm of ``grad_estimate`` (logged every step).
+    """
+
+    grad_estimate: Any
+    grad_norm: jax.Array
+
+
+def make_anchor_step(per_sample_grad_fn):
+    """Build an anchor-step kernel for a given per-sample gradient function.
+
+    Parameters
+    ----------
+    per_sample_grad_fn : callable
+        Vmapped per-sample gradient: ``(params, x_batch, y_batch) -> pytree``
+        with leaves of shape ``(B, *param_shape)``.
+
+    Returns
+    -------
+    anchor_step : callable
+        ``anchor_step(params, x_batch, y_batch, mask, b1, L0, sigma1, key)
+        -> StepOutput``. ``mask`` is a (B,) Poisson mask; ``b1`` is the
+        *expected* batch size used for averaging.
+
+    Notes
+    -----
+    Algorithm 2, anchor branch (``t mod q == 0``)::
+
+        g_t  ~ N(0, sigma1^2 I)
+        ∇_t  = (1 / b1) * sum_{x in S_t} clip(∇f(w_t; x), L0)  +  g_t
+    """
+
+    def anchor_step(params, x_batch, y_batch, mask, b1, L0, sigma1, key):
+        per_sample = per_sample_grad_fn(params, x_batch, y_batch)
+        per_sample = per_sample_clip(per_sample, L0)            # Algorithm 2, Section 4.1
+        per_sample = per_sample_apply_mask(per_sample, mask)    # Poisson subsampling
+        summed = pytree_sum_over_batch(per_sample)
+        averaged = pytree_scale(summed, 1.0 / b1)
+        noisy = add_pytree_gaussian_noise(averaged, key, sigma1)
+        return StepOutput(grad_estimate=noisy, grad_norm=pytree_global_norm(noisy))
+
+    return anchor_step
+
+
+def make_variation_step(per_sample_grad_fn):
+    """Build a variation-step kernel for a given per-sample gradient function.
+
+    Parameters
+    ----------
+    per_sample_grad_fn : callable
+        Vmapped per-sample gradient: ``(params, x_batch, y_batch) -> pytree``
+        with leaves of shape ``(B, *param_shape)``.
+
+    Returns
+    -------
+    variation_step : callable
+        ``variation_step(params_t, params_prev, prev_grad_est, x_batch,
+        y_batch, mask, b2, L1, sigma2, sigma2_hat, key) -> StepOutput``.
+
+    Notes
+    -----
+    Algorithm 2, variation branch (``t mod q != 0``)::
+
+        delta_w  = ||w_t - w_{t-1}||
+        clip_c   = L1 * delta_w
+        g_t      ~ N(0, min(sigma2 * delta_w, sigma2_hat)^2 I)
+        Δ_t      = (1 / b2) * sum_{x in S_t}
+                   clip(∇f(w_t; x) - ∇f(w_{t-1}; x), clip_c)  +  g_t
+        ∇_t      = ∇_{t-1} + Δ_t
+    """
+
+    def variation_step(params_t, params_prev, prev_grad_est, x_batch, y_batch,
+                       mask, b2, L1, sigma2, sigma2_hat, key):
+        delta_w = pytree_global_norm(pytree_sub(params_t, params_prev))
+
+        per_sample_t = per_sample_grad_fn(params_t, x_batch, y_batch)
+        per_sample_prev = per_sample_grad_fn(params_prev, x_batch, y_batch)
+        per_sample_diff = pytree_sub(per_sample_t, per_sample_prev)
+
+        clip_c = L1 * delta_w
+        per_sample_diff = per_sample_clip(per_sample_diff, clip_c)   # Algorithm 2, Section 4.1
+        per_sample_diff = per_sample_apply_mask(per_sample_diff, mask)
+        summed = pytree_sum_over_batch(per_sample_diff)
+        averaged = pytree_scale(summed, 1.0 / b2)
+
+        noise_std = jnp.minimum(sigma2 * delta_w, sigma2_hat)
+        noisy_delta = add_pytree_gaussian_noise(averaged, key, noise_std)
+
+        new_grad_est = pytree_add(prev_grad_est, noisy_delta)
+        return StepOutput(
+            grad_estimate=new_grad_est,
+            grad_norm=pytree_global_norm(new_grad_est),
+        )
+
+    return variation_step
+
+
+def sgd_update(params, grad_estimate, lr: float):
+    """Apply one ``params <- params - lr * grad`` update.
+
+    Parameters
+    ----------
+    params : pytree
+    grad_estimate : pytree
+        Same structure as ``params``.
+    lr : float
+        Learning rate.
+
+    Returns
+    -------
+    new_params : pytree
+    """
+    return jax.tree.map(lambda p, g: p - lr * g, params, grad_estimate)

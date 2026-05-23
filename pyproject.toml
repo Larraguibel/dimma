@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dimma"
+version = "0.1.0"
+description = "JAX-based library of differentially private optimization algorithms."
+requires-python = ">=3.10"
+dependencies = [
+    "jax",
+    "flax",
+    "optax",
+    "dp-accounting",
+    "pandas",
+    "pyarrow",
+    "numpy",
+    "matplotlib"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "scikit-learn",
+]
+examples = [
+    "matplotlib",
+    "scikit-learn",
+    "jupyter",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dimma"]
