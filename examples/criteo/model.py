@@ -43,20 +43,24 @@ class MLP(nn.Module):
         return logit.squeeze(-1)
 
 
-# Module instance — shared across all functions so apply calls are consistent.
-_mlp: MLP | None = None
-
-
-def _get_mlp(hidden_dims: Sequence[int]) -> MLP:
-    global _mlp
-    if _mlp is None or tuple(_mlp.hidden_dims) != tuple(hidden_dims):
-        _mlp = MLP(hidden_dims=tuple(hidden_dims))
-    return _mlp
-
-
 # ---------------------------------------------------------------------------
-# Public API (same signatures as before)
+# Public API
 # ---------------------------------------------------------------------------
+
+def _mlp_from_params(params: dict) -> MLP:
+    """Reconstruct an MLP module from its param pytree.
+
+    Flax names layers ``Dense_0, Dense_1, ..., Dense_N``.  The last Dense is
+    the scalar output layer (output dim 1); all preceding ones are hidden.
+    ``hidden_dims`` is read from the kernel output dimensions.
+    """
+    n_dense = sum(1 for k in params if k.startswith('Dense_'))
+    hidden_dims = tuple(
+        params[f'Dense_{i}']['kernel'].shape[1]
+        for i in range(n_dense - 1)
+    )
+    return MLP(hidden_dims=hidden_dims)
+
 
 def init_params(
     key: jax.Array,
@@ -68,7 +72,7 @@ def init_params(
     Returns the ``'params'`` pytree (a nested dict of arrays), which is a
     plain JAX pytree compatible with ``jax.grad`` / ``jax.vmap`` / ``jax.jit``.
     """
-    mlp = _get_mlp(hidden_dims)
+    mlp = MLP(hidden_dims=tuple(hidden_dims))
     dummy = jnp.zeros((input_dim,))
     variables = mlp.init(key, dummy)
     return variables['params']
@@ -77,7 +81,7 @@ def init_params(
 def forward(params: dict, x: jax.Array) -> jax.Array:
     """Compute MLP logits for a single example ``(d,)`` or batch ``(B, d)``.
 
-    Uses the module created by the most recent :func:`init_params` call.
+    The architecture is inferred directly from ``params`` — no global state.
 
     Parameters
     ----------
@@ -91,8 +95,7 @@ def forward(params: dict, x: jax.Array) -> jax.Array:
     logit : jax.Array
         Shape ``()`` for a single example or ``(B,)`` for a batch.
     """
-    assert _mlp is not None, "Call init_params before forward."
-    return _mlp.apply({'params': params}, x)
+    return _mlp_from_params(params).apply({'params': params}, x)
 
 
 def per_sample_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
