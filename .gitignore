@@ -47,6 +47,3 @@ Thumbs.db
 
 # Pyenv (personal Python version pin)
 .python-version
-
-# Claude files
-CONTEXT.md
