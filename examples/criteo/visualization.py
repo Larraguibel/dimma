@@ -277,6 +277,50 @@ def plot_q_sweep(q_values: Sequence[int],
     return fig
 
 
+def plot_delta_sweep(
+    exponents: Sequence[float],
+    auc_random: Sequence[float],
+    auc_final: Sequence[float],
+    auc_baseline: float,
+    save_path: str | Path,
+) -> plt.Figure:
+    """Plot test ROC-AUC vs. δ exponent α (where δ = 1/n^α).
+
+    Parameters
+    ----------
+    exponents : Sequence[float]
+        The α values that were swept.
+    auc_random : Sequence[float]
+        Test ROC-AUC of the random iterate w̄ per α.
+    auc_final : Sequence[float]
+        Test ROC-AUC of the final iterate w_T per α.
+    auc_baseline : float
+        Test ROC-AUC of the non-private JAX baseline (horizontal reference line).
+    save_path : str or pathlib.Path
+        Output PNG location.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+    save_path = _ensure_parent(save_path)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(exponents, auc_random, marker="o", lw=1.4, color="tab:green",
+            label=r"$\bar w$ (random iterate)")
+    ax.plot(exponents, auc_final, marker="s", lw=1.4, color="tab:blue",
+            label=r"$w_T$ (final iterate)")
+    ax.axhline(auc_baseline, ls="--", lw=1.2, color="tab:red",
+               label="non-private baseline")
+    ax.set_xlabel(r"$\delta$ exponent $\alpha$  ($\delta = 1/n^\alpha$)")
+    ax.set_ylabel("Test ROC-AUC")
+    ax.set_title(r"Effect of $\delta$ on utility  ($\varepsilon = 1.0$ fixed)")
+    ax.legend(loc="best")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    return fig
+
+
 def plot_hyperparameter_summary(config: dict,
                                 save_path: str | Path) -> plt.Figure:
     """Render a run's hyperparameters as a one-page table figure.
