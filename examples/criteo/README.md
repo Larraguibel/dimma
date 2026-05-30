@@ -25,13 +25,11 @@ derivative works must be shared under the same license.
 
 ## Notebooks
 
-- `train_private_spiderboost.ipynb` — reference end-to-end run of
-  Private SpiderBoost on the 13 integer features, with final ROC-AUC
-  and gradient-norm plots.
-- `phase_length_q_tradeoff.ipynb` — sweep over phase length `q` at
-  fixed `epsilon`.
-- `privacy_utility_tradeoff.ipynb` — sweep over privacy budget
-  `epsilon` at fixed `q`.
+| Notebook | View |
+|---|---|
+| `train_private_spiderboost.ipynb` — reference end-to-end run of Private SpiderBoost on the 13 integer features, with final ROC-AUC and gradient-norm plots. | [![nbviewer](https://raw.githubusercontent.com/jupyter/design/master/logos/Badges/nbviewer_badge.svg)](https://nbviewer.org/github/Larraguibel/dimma/blob/main/examples/criteo/train_private_spiderboost.ipynb) |
+| `phase_length_q_tradeoff.ipynb` — sweep over phase length `q` at fixed `epsilon`. | [![nbviewer](https://raw.githubusercontent.com/jupyter/design/master/logos/Badges/nbviewer_badge.svg)](https://nbviewer.org/github/Larraguibel/dimma/blob/main/examples/criteo/phase_length_q_tradeoff.ipynb) |
+| `privacy_utility_tradeoff.ipynb` — sweep over privacy budget `epsilon` at fixed `q`. | [![nbviewer](https://raw.githubusercontent.com/jupyter/design/master/logos/Badges/nbviewer_badge.svg)](https://nbviewer.org/github/Larraguibel/dimma/blob/main/examples/criteo/privacy_utility_tradeoff.ipynb) |
 
 ## What changed from the original
 
