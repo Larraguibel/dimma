@@ -321,6 +321,71 @@ def plot_delta_sweep(
     return fig
 
 
+def plot_grad_norm_comparison(
+    dp_grad_norm: Sequence[float],
+    dp_cumulative_evals: Sequence[int],
+    baseline_grad_norm: Sequence[float],
+    baseline_cumulative_evals: Sequence[int],
+    save_path: str | Path,
+) -> plt.Figure:
+    """Plot DP and non-private SPIDER gradient-norm trajectories on a shared log-y axis.
+
+    The x-axis is cumulative expected gradient evaluations (computed per step via
+    ``expected_grad_evals``), making anchor steps and variation steps commensurable
+    despite their very different per-step costs.  The two curves are visually
+    distinguishable by color and line style.
+
+    Parameters
+    ----------
+    dp_grad_norm : Sequence[float], length T+1
+        Per-step gradient-norm history from the DP Private SpiderBoost run.
+    dp_cumulative_evals : Sequence[int], length T+1
+        Cumulative expected gradient evaluations at each step of the DP run.
+    baseline_grad_norm : Sequence[float], length T+1
+        Per-step gradient-norm history from the non-private SPIDER baseline run.
+    baseline_cumulative_evals : Sequence[int], length T+1
+        Cumulative expected gradient evaluations at each step of the baseline run.
+    save_path : str or pathlib.Path
+        Output PNG location.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+
+    Notes
+    -----
+    Both histories are expected to have the same length (same T, q, b1, b2) so the
+    cumulative x-axis is identical; they are plotted on the same axes for direct
+    comparison.  Values <= 0 are masked to NaN for safe log scaling.
+    """
+    save_path = _ensure_parent(save_path)
+    dp_arr = np.asarray(dp_grad_norm, dtype=float)
+    dp_arr = np.where(dp_arr > 0, dp_arr, np.nan)
+    bl_arr = np.asarray(baseline_grad_norm, dtype=float)
+    bl_arr = np.where(bl_arr > 0, bl_arr, np.nan)
+
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    ax.plot(
+        np.asarray(dp_cumulative_evals), dp_arr,
+        lw=1.0, color="tab:orange", ls="-",
+        label="Private SpiderBoost (DP)",
+    )
+    ax.plot(
+        np.asarray(baseline_cumulative_evals), bl_arr,
+        lw=1.0, color="tab:blue", ls="--",
+        label="Non-private SPIDER baseline",
+    )
+    ax.set_yscale("log")
+    ax.set_xlabel("Cumulative expected gradient evaluations")
+    ax.set_ylabel(r"$\|\nabla_t\|_2$ (log scale)")
+    ax.set_title("Gradient norm: DP vs. non-private SPIDER")
+    ax.legend(loc="upper right")
+    ax.grid(True, alpha=0.3, which="both")
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    return fig
+
+
 def plot_hyperparameter_summary(config: dict,
                                 save_path: str | Path) -> plt.Figure:
     """Render a run's hyperparameters as a one-page table figure.
