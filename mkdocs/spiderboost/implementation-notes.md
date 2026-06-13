@@ -73,6 +73,20 @@ Consequence: a run that triggers a truncation event has a different Poisson-mask
 
 Not a correctness issue. Worth knowing if you're doing fine-grained ablations or RNG audits.
 
+## F₀ in Theorem 4.2 is not directly computable
+
+Theorem 4.2 uses **F₀ = F(w₀; S) − min_w F(w; S)**, the initial suboptimality relative to the global empirical minimum. For a non-convex model such as the Criteo MLP, the global minimum is unknown, so F₀ cannot be computed exactly.
+
+Three practical approximations exist:
+
+1. **F(w₀; S) directly** — a valid upper bound, since F* ≥ 0 implies F₀ ≤ F(w₀; S). Safe and defensible; always inflates the theoretical bound upward, consistent with O() being an upper bound.
+2. **F(w₀; S) − F(w_T; S)** — uses the final training loss as a lower bound on F*. Tighter, but requires a completed run, and F(w_T; S) may still be far above the true minimum.
+3. **F(w₀; S) − F_bayes** — subtracts an estimated irreducible noise floor (≈ 0.44–0.45 nats for Criteo). Dataset-specific and informal.
+
+**Why the choice rarely matters in practice.** F₀ appears in term 1 of the bound only as F₀^{1/3}. A factor-of-2 error in F₀ produces a 2^{1/3} ≈ 1.26× error in term 1. When fitting the unknown constant C empirically, this imprecision is absorbed into C and does not affect the ε-dependence being tested.
+
+**Recommendation:** use option 1 (plain initial loss) and state it clearly. Reserve option 3 for sensitivity checks.
+
 ## Loose ends
 
 Things noted during the dimma build that deserve attention but were not fixed in the initial extraction:
