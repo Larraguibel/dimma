@@ -1,67 +1,112 @@
-# dimma — Project Context
+# dimma — Domain Language
 
-## What it is
+This file is the **ubiquitous language glossary** for the dimma project.
+One term per concept. Use these names — and only these names — in code, comments, issues, and prompts.
+No implementation details, no specs, no scratch pad.
 
-`dimma` is a JAX-based Python library (v0.1.0) implementing differentially private (DP) stochastic optimization algorithms with composable privacy accounting. It is developed as part of the FONDECYT research project.
+---
 
-## Core algorithm
+## Privacy guarantees
 
-The current release implements **Private SpiderBoost** (Algorithm 2, Arora et al., ICML 2023), a variance-reduced variant of DP-SGD that exploits second-order curvature information for faster convergence under a formal (ε, δ)-DP guarantee. The training loop produces two iterates: the final one and a random intermediate iterate (the one with the formal guarantee).
+**Differential Privacy (DP)**
+A formal mathematical guarantee that the output of an algorithm changes negligibly when any single individual's data is added or removed. Parameterized by (ε, δ): ε bounds the privacy loss; δ bounds the probability of a catastrophic failure.
+_Avoid_: data privacy, anonymization, privacy guarantee, approximate DP
 
-## Repository layout
+**Privacy budget**
+The total allowable (ε, δ) expenditure across all training rounds. Once consumed, no further training is permitted under the same guarantee.
+_Avoid_: privacy cost, epsilon budget, DP budget
 
-```
-src/dimma/
-├── algorithms/spiderboost/   # train(), TrainConfig, JIT-compiled anchor/variation kernels
-├── accounting/               # compute_noise_scales() → (σ1, σ2, σ2_hat); RDP accountants
-├── core/
-│   ├── sampling/poisson.py   # Poisson subsampling (standard + truncated heuristic)
-│   ├── clipping.py           # Per-sample gradient clipping
-│   ├── noise.py              # Gaussian noise injection
-│   └── pytree.py             # Pytree norm / arithmetic helpers
-├── datasets/                 # Cached dataset loaders (Criteo 1M, ...)
-└── utils/device.py           # Device helpers
+**Rényi Differential Privacy (RDP)**
+An intermediate privacy accounting framework (parameterized by order α) that composes tightly across rounds and converts to (ε, δ)-DP at the end. Used internally by `compute_noise_scales`.
+_Avoid_: moment accountant, RDP accounting, Rényi DP
 
-tests/                        # Pytest suite including regression tests vs. reference impls
-examples/criteo/              # Three Jupyter notebooks: training, q sweep, ε sweep
-```
+**Privacy accounting**
+The process of tracking cumulative privacy loss across training steps. In dimma this is delegated to Google's `dp-accounting` library.
+_Avoid_: privacy tracking, epsilon tracking
 
-## Public API (top-level `dimma.*`)
+---
 
-| Symbol | Purpose |
-|---|---|
-| `train(x, y, per_sample_loss_fn, init_params, config, noise_scales)` | Full training loop |
-| `TrainConfig` | Hyperparameters: ε, δ, L0, L1, T, q, b1, b2, η, seed |
-| `TrainResult` | `.params_final`, `.params_random`, `.history` |
-| `TrainHistory` / `StepInfo` | Per-step callback data |
-| `compute_noise_scales(ε, δ, L0, L1, T, q, b1, b2, n)` | Calibrates (σ1, σ2, σ2_hat) via Google dp-accounting (RDP) |
-| `NoiseScales` | Named triple returned by `compute_noise_scales` |
+## Training structure
 
-The library is **model-agnostic**: it takes a `per_sample_loss_fn` and an `init_params` pytree; all model construction, evaluation, and I/O live in user code.
+**Phase**
+One complete cycle of one anchor step followed by `q` variation steps. The unit of iteration in Private SpiderBoost.
+_Avoid_: epoch, round, cycle
 
-## Key design choices
+**Phase length (q)**
+The number of variation steps per anchor step within one phase. A key hyperparameter: larger `q` amortizes the cost of the anchor step but increases variance accumulation.
+_Avoid_: steps per phase, inner loop count, q parameter
 
-- **JAX + JIT kernels**: anchor and variation steps are JIT-compiled for performance.
-- **Poisson subsampling**: two variants — standard (rejection on oversize) and truncated heuristic.
-- **No pinned JAX version**: users manage their JAX/CUDA environment; dimma declares only a lower bound on Python (`>=3.10`).
-- **`src/` layout** with Hatchling build backend.
-- **Dataset caching**: Criteo 1M is downloaded on demand with checksum verification; a one-time attribution notice is printed to stderr.
+**Anchor step**
+The step within a phase that computes a full gradient at the current reference point, establishing the variance-reduction baseline. Corresponds to the SPIDER "snapshot" computation.
+_Avoid_: snapshot step, reference computation, full-batch step, outer step
 
-## Dependencies
+**Variation step**
+Each of the `q` lightweight steps within a phase that uses a stochastic gradient estimator corrected by the anchor-step baseline. Cheaper per step than an anchor step.
+_Avoid_: inner step, correction step, SPIDER step
 
-- **Runtime**: `jax`, `flax`, `optax`, `dp-accounting`, `pandas`, `pyarrow`, `numpy`, `matplotlib`
-- **dev extras**: `pytest`, `scikit-learn`
-- **examples extras**: `matplotlib`, `scikit-learn`, `jupyter`
+**Final iterate**
+The model parameters at the end of the last variation step — the last point in the trajectory. Returned as `TrainResult.params_final`.
+_Avoid_: last checkpoint, terminal parameters
 
-## Examples
+**Random iterate**
+A uniformly sampled intermediate iterate from the training trajectory. This is the iterate with the formal (ε, δ)-DP convergence guarantee. Returned as `TrainResult.params_random`.
+_Avoid_: random checkpoint, sampled params, output with guarantee
 
-Three notebooks in `examples/criteo/` demonstrate Private SpiderBoost on Criteo 1M (CC-BY-NC-SA 4.0, ~30 MB, auto-downloaded):
+---
 
-1. `train_private_spiderboost.ipynb` — end-to-end run, ROC-AUC and gradient-norm plots
-2. `phase_length_q_tradeoff.ipynb` — sweep over phase length `q` at fixed ε
-3. `privacy_utility_tradeoff.ipynb` — sweep over ε at fixed `q`
+## Noise and clipping
 
-## Citation
+**Noise scale (σ)**
+A scalar multiplier on the Gaussian noise added to a gradient. dimma uses three: `σ₁` (anchor step), `σ₂` (variation step), `σ₂_hat` (bias correction term). Calibrated by `compute_noise_scales` to satisfy the privacy budget.
+_Avoid_: noise multiplier, sigma, standard deviation
 
-Implements the algorithm from:
-> Arora, Bassily, González, Guzmán, Menart, Ullah. *Faster Differentially Private Convex Optimization via Second-Order Methods.* ICML 2023.
+**Per-sample gradient clipping**
+Bounding each individual sample's gradient to L2-norm ≤ C before aggregation. Required for DP: without it, a single sample could dominate the update.
+_Avoid_: gradient clipping, norm clipping, clip
+
+**Clipping threshold (C)**
+The maximum L2 norm allowed for a per-sample gradient. Denoted `L0` (anchor) and `L1` (variation) in the API, following the paper's notation.
+_Avoid_: clip norm, max gradient norm
+
+---
+
+## Sampling
+
+**Poisson subsampling**
+Selecting each training example independently with probability `q` (the sampling rate), rather than drawing a fixed-size batch. This amplifies the privacy guarantee multiplicatively.
+_Avoid_: random sampling, batch sampling, q-sampling
+
+**Sampling rate (q)**
+The per-example inclusion probability for Poisson subsampling. Not to be confused with phase length `q` — they share notation in the paper but are the same hyperparameter (they are linked in the `TrainConfig`).
+_Avoid_: batch fraction, subsample probability
+
+---
+
+## Model interface
+
+**Pytree**
+A JAX-native nested structure of arrays (dicts, lists, tuples of arrays) used to represent model parameters and gradients. dimma operates on arbitrary pytrees — it is model-agnostic.
+_Avoid_: parameter dict, weight tensors, model weights
+
+**Per-sample loss function**
+A callable `(params, x_i, y_i) → scalar` that computes the loss for a single example. The user provides this; dimma applies `jax.vmap` internally to vectorize over the batch.
+_Avoid_: loss function, batch loss, objective
+
+---
+
+## Public API surface
+
+**`train()`**
+The single entry point for running Private SpiderBoost. Takes data, a per-sample loss function, initial params, a config, and noise scales. Returns a `TrainResult`.
+
+**`TrainConfig`**
+A dataclass holding all hyperparameters: ε, δ, L0, L1, T (total phases), q (phase length / sampling rate), b1 (anchor batch size), b2 (variation batch size), η (learning rate), seed.
+
+**`TrainResult`**
+The output of `train()`: contains `params_final`, `params_random`, and `history`.
+
+**`compute_noise_scales()`**
+Calibrates the three noise scales (σ₁, σ₂, σ₂_hat) from the privacy budget and training config using RDP accounting. Must be called before `train()`.
+
+**`NoiseScales`**
+A named triple `(σ₁, σ₂, σ₂_hat)` returned by `compute_noise_scales()`.

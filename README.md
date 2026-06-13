@@ -198,10 +198,19 @@ and (until a `dimma` preprint is available) this repository:
             algorithms},
   author = {Larraguibel, Javier},
   year   = {2026},
-  url    = {https://github.com/<your-username>/dimma}
+  url    = {https://github.com/Larraguibel/dimma}
 }
 ```
 
-Replace `<your-username>` with the GitHub user/organization the repo
-is hosted under, and update the author list / paper reference once a
-companion preprint is posted.
+Update the author list and paper reference once a companion preprint is posted.
+
+## Contributing
+
+Before opening an issue or sending a PR, read:
+
+- [`CONTEXT.md`](CONTEXT.md) — domain language glossary; use these terms in code, comments, and issues
+- [`CLAUDE.md`](CLAUDE.md) — build/test commands, conventions, and learned rules for AI agents
+- [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) — how issues are filed and triaged
+- [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) — label vocabulary and when to apply each
+
+Privacy accounting changes and public API changes require human review before implementation (`ready-for-human` label). See the triage guide for details.
