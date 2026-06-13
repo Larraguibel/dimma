@@ -138,6 +138,42 @@ def batch_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
 
 
 # ---------------------------------------------------------------------------
+# Budget utilities
+# ---------------------------------------------------------------------------
+
+def expected_grad_evals(T: int, q: int, b1: int, b2: int) -> int:
+    """Expected total gradient evaluations over a Private SpiderBoost run.
+
+    The loop runs t = 0, ..., T (T+1 steps).  Anchor steps fire when
+    ``t % q == 0``, costing ``b1`` gradient evaluations each (one full-batch
+    gradient).  Variation steps fire otherwise, costing ``2 * b2`` each —
+    one evaluation at ``params_t`` and one at ``params_prev`` — to form the
+    variance-reduced SPIDER difference.  Batch sizes are the *expected*
+    (nominal) sizes from the paper; no assertion is made about realised
+    Poisson draws.
+
+    Parameters
+    ----------
+    T : int
+        Number of iterations (loop runs t = 0..T).
+    q : int
+        Phase length; anchor steps fire when ``t % q == 0``.
+    b1 : int
+        Anchor (full-gradient) batch size.
+    b2 : int
+        Variation batch size.
+
+    Returns
+    -------
+    int
+        Expected number of per-sample gradient evaluations.
+    """
+    n_anchors   = T // q + 1
+    n_variation = T - T // q
+    return n_anchors * b1 + n_variation * 2 * b2
+
+
+# ---------------------------------------------------------------------------
 # Non-private SPIDER training loop
 # ---------------------------------------------------------------------------
 
