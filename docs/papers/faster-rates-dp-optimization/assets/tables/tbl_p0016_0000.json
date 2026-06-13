@@ -1,0 +1,37 @@
+{
+  "data": {
+    "0": {
+      "0": "Faster Rates of Convergence to Stationary Points in Differentially Private Optimization",
+      "1": "",
+      "2": "",
+      "3": "(cid:17)\n(cid:26)(cid:16) n5/3ε2/3",
+      "4": "(cid:16) nε√\n.\nis (ε, δ)-DP and has oracle complexity ˜O\nmax\n,",
+      "5": "d1/3\nd",
+      "6": "Proof. For privacy, we rely on the moment accountant analysis of the Gaussian mechanism as per Theorem B.2. Note that",
+      "7": "each gradient estimate computed in line 9 has elements with ℓ2-norm at most L0, and this estimate is computed at most T\nq",
+      "8": "times. Similarly, for a gradient variation at step t in line 13 we have norm bound L1 ∥wt − wt−1∥, and have that at most T",
+      "9": "such estimates are computed. As such, the scale of noise in both cases ensures the overall algorithm is (ε, δ)-DP by Theorem",
+      "10": "B.2.",
+      "11": "√",
+      "12": "d log(1/δ)",
+      "13": "We now prove the convergence result. To simplify notation in the following, we define ¯α =\n.\nIf b1 = n (full",
+      "14": "nϵ",
+      "15": "(cid:17)\n(cid:16) L2\n(cid:16) L2",
+      "16": "",
+      "17": "0T ¯α2\n1\n+ L2\nbatch gradient), the conditions of Lemma 4.1 are satisfied with τ 2\nand τ 2\nand some\n1T ¯α2(cid:17)\n1 = O\n2 = O",
+      "18": "q\nb2",
+      "19": "",
+      "20": "1\nsetting of q so long as T ≥ q n2\n= q and T ≥ n2\nthen τ 2\n. Further, if b2 ≥\n2 = O (cid:0)L2\n1T ¯α2(cid:1). Thus the condition on q in",
+      "21": "T ¯α2\nb2\nb2",
+      "22": "1\n2",
+      "23": "",
+      "24": "1\n1\n=\nLemma B.1 is satisfied with q = L2\nsince η =",
+      "25": "T ¯α2\nτ 2\n2L1",
+      "26": "2",
+      "27": "Plugging into Eqn. (1) we obtain",
+      "28": "√",
+      "29": "(cid:33)\n(cid:32)(cid:114)"
+    }
+  },
+  "accuracy": 100.00000000000004
+}

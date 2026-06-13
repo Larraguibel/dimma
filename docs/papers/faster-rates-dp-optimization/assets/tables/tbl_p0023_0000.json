@@ -1,0 +1,17 @@
+{
+  "data": {
+    "0": {
+      "0": "Algorithm 5 Phased SGD(S, (w, x) (cid:55)→ f (w; x)), R, η, S(·), σ)",
+      "1": "Input: Dataset S, loss function f (·; x)), radius R of the constraint set W, steps T , η, Selection function S, Noise variance",
+      "2": "σ",
+      "3": "1: w1 = 0",
+      "4": "2: K = ⌈log (|S|)⌉ and T0 = 1",
+      "5": "3:\nfor k = 1 to K − 1 do",
+      "6": "4:\nTk = 2−k |S| , ηk = 4−kη, σk = ηkσ",
+      "7": "5:\nwk+1 = OutputPerturbedSGD(wk, STk−1+1:Tk , R, ηk, σk, S(·))",
+      "8": "6:\nend for",
+      "9": "Output:\nw = wK"
+    }
+  },
+  "accuracy": 100.00000000000001
+}

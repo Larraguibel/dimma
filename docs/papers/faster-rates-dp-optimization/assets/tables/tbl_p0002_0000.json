@@ -1,0 +1,37 @@
+{
+  "data": {
+    "0": {
+      "0": "Non-convex",
+      "1": "",
+      "2": "Convex",
+      "3": "Non-convex\nGLM",
+      "4": "",
+      "5": "Convex GLM"
+    },
+    "1": {
+      "0": "Empirical",
+      "1": "Population",
+      "2": "Population",
+      "3": "Empirical",
+      "4": "Population",
+      "5": "Population"
+    },
+    "2": {
+      "0": "(cid:16) √\n(cid:17)2/3\nd\n(Thm. 4.2)\nnε",
+      "1": "(cid:17)1/2\n(cid:16) √\n1\nd\n(Thm. 3.2)\nnε\nn1/3 +",
+      "2": "√\n1\nd\n√\n(Thm. 5.1)\nnε\nn +",
+      "3": "rank\n1\n(cid:2) √\n(cid:3)2/3\n∧\n(Cor. 6.2)\nnε\n(nϵ)2/5",
+      "4": "rank\n1\n1\n√\n(cid:3)2/3 ∧\n(Cor. 6.2)\nnε\nn + (cid:2) √\n(nϵ)2/5",
+      "5": "√\nrank\n1\n√\n1√\n∧\n(Cor. 6.2)\nnε\nn +\nnϵ"
+    },
+    "3": {
+      "0": "(cid:16) √\n(cid:17)1/2\nd\n(Wang et al., 2017)\nnε",
+      "1": "√\nd\n(cid:1)1/2\ndε + (cid:0) √\n(Zhou et al., 2020)\nnε",
+      "2": "None",
+      "3": "(cid:16) √\n(cid:17)1/2\nrank\n(Song et al., 2021)\nnε",
+      "4": "None",
+      "5": "None"
+    }
+  },
+  "accuracy": 99.99999999999993
+}

@@ -1,0 +1,23 @@
+{
+  "data": {
+    "0": {
+      "0": "",
+      "1": "Proof of Corollary 6.2. The results follow from Theorem 6.1 provided we show that the conditions on the base algorithm in",
+      "2": "the Theorem statement are satisfied. The privacy and accuracy claims follow from Theorem 3.2 and 5.1 respectively. We",
+      "3": "note that even though we are given population stationarity guarantee for the convex case, the same bound for empirical",
+      "4": "stationarity guarantee simply follows from the re-sampling argument in (Bassily et al., 2019). The only thing left to show is",
+      "5": "the high-probability bound on the trajectory of the algorithm.",
+      "6": "Non-convex setting with Private Spiderboost:"
+    },
+    "1": {
+      "0": "Faster Rates of Convergence to Stationary Points in Differentially Private Optimization",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "From the update in Algorithm 2, we have that for any t"
+    }
+  },
+  "accuracy": 63.329331461335485
+}
