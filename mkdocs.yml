@@ -1,0 +1,23 @@
+site_name: dimma — DP-SGD Projects
+docs_dir: mkdocs
+
+theme:
+  name: material
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - DP-SGD Projects: index.md
+  - "Differential Privacy for SGD: Overview": overview.md
+  - Jax, Flax and Other DP-SGD Libraries: tooling.md
+  - "dimma: the library": library.md
+  - Private Spider-Boost:
+      - Private Spider-Boost: spiderboost/index.md
+      - Differences between theory and implementation: spiderboost/theory-vs-implementation.md
+      - "Implementation notes (heuristics, deferred decisions)": spiderboost/implementation-notes.md
+      - The q-invariance of params_random: spiderboost/q-invariance.md
+  - Next steps: next-steps.md
