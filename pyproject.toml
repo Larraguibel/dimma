@@ -28,6 +28,10 @@ examples = [
     "scikit-learn",
     "jupyter",
 ]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dimma"]
