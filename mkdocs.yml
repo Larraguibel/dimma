@@ -1,4 +1,5 @@
 site_name: dimma — DP-SGD Projects
+site_url: https://larraguibel.github.io/dimma/
 docs_dir: mkdocs
 
 theme:
