@@ -48,4 +48,5 @@ Thumbs.db
 # Pyenv (personal Python version pin)
 .python-version
 
-base_papers//site/
+base_papers/
+/site/

@@ -27,6 +27,26 @@ Highlights:
 
 Status: `0.1.0`. The public API may change before `1.0`.
 
+## Documentation
+
+Full project documentation is published at
+**<https://larraguibel.github.io/dimma/>** (built with MkDocs, deployed
+automatically from `main`). It is the narrative companion to this README
+and covers:
+
+- **Differential Privacy for SGD** — the conceptual foundations:
+  subsampling, sensitivity, clipping, and privacy accounting.
+- **JAX, Flax & Optax tooling** — the primitives used to build
+  non-standard DP-SGD variants, and why off-the-shelf libraries don't fit.
+- **The dimma library** — module map, design conventions, and how to add
+  a new algorithm.
+- **Private SpiderBoost** — the implemented algorithm, the gaps between
+  the paper's theory and the code, implementation heuristics, and the
+  `q`-invariance of the random-output iterate.
+
+The documentation source lives in [`mkdocs/`](mkdocs/); `docs/` is
+reserved for agent-facing context and is not part of the published site.
+
 ## Quickstart
 
 ```python
@@ -97,6 +117,14 @@ experiments), install the `examples` extras:
 pip install -e ".[examples]"
 ```
 
+To build the documentation site locally, install the `docs` extras and
+serve it:
+
+```bash
+pip install -e ".[docs]"
+mkdocs serve   # live preview at http://127.0.0.1:8000
+```
+
 You can combine extras, e.g. `pip install -e ".[dev,examples]"`.
 
 ## Examples
@@ -132,6 +160,9 @@ src/dimma/
 
 tests/                 # Pytest suite (regression vs. reference impls)
 examples/criteo/       # Notebook walkthroughs
+mkdocs/                # Published documentation source (-> GitHub Pages)
+mkdocs.yml             # MkDocs / Material site configuration
+docs/                  # Agent-facing context (not published)
 ```
 
 ### Dependency overview
@@ -143,6 +174,8 @@ examples/criteo/       # Notebook walkthroughs
 - **`examples` extras**: `matplotlib`, `scikit-learn`, `jupyter`
   (needed by the notebooks and plotting utilities in
   [examples/criteo/](examples/criteo/)).
+- **`docs` extras**: `mkdocs`, `mkdocs-material` (needed only to build
+  the documentation site in [mkdocs/](mkdocs/) locally).
 
 ## Datasets and licensing
 
