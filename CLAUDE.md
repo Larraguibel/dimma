@@ -26,7 +26,7 @@ pytest --cov=dimma --cov-report=term-missing
 ```
 src/dimma/          # library source (src/ layout, Hatchling backend)
 tests/              # pytest suite; includes regression tests vs. reference impls
-examples/criteo/    # three Jupyter notebooks demonstrating Private SpiderBoost
+examples/private_spiderboost/    # Private SpiderBoost demos: notebooks/, lib/ (shared model.py + viz), scripts/, figs/
 docs/
   adr/              # Architecture Decision Records — hard-to-reverse, non-obvious choices
   agents/           # Agent skill documentation (issue tracker, triage, domain)

@@ -94,7 +94,7 @@ result = dimma.train(
 params_dp = result.params_random  # the privately-released model
 ```
 
-See [examples/criteo/](examples/criteo/) for runnable notebooks.
+See [examples/private_spiderboost/](examples/private_spiderboost/) for runnable notebooks.
 
 ## Installation
 
@@ -129,16 +129,16 @@ You can combine extras, e.g. `pip install -e ".[dev,examples]"`.
 
 ## Examples
 
-Runnable Jupyter notebooks live under [examples/criteo/](examples/criteo/)
+Runnable Jupyter notebooks live under [examples/private_spiderboost/](examples/private_spiderboost/)
 and demonstrate Private SpiderBoost on the Criteo 1M click-prediction
 sample (downloaded automatically on first run, ~30 MB). See the
-[examples README](examples/criteo/README.md) for details.
+[examples README](examples/private_spiderboost/README.md) for details.
 
-- [`train_private_spiderboost.ipynb`](examples/criteo/train_private_spiderboost.ipynb) —
+- [`train_private_spiderboost.ipynb`](examples/private_spiderboost/notebooks/train_private_spiderboost.ipynb) —
   end-to-end reference run with final ROC-AUC and gradient-norm plots.
-- [`phase_length_q_tradeoff.ipynb`](examples/criteo/phase_length_q_tradeoff.ipynb) —
+- [`phase_length_q_tradeoff.ipynb`](examples/private_spiderboost/notebooks/phase_length_q_tradeoff.ipynb) —
   sweep over the phase length `q` at fixed `epsilon`.
-- [`privacy_utility_tradeoff.ipynb`](examples/criteo/privacy_utility_tradeoff.ipynb) —
+- [`privacy_utility_tradeoff.ipynb`](examples/private_spiderboost/notebooks/privacy_utility_tradeoff.ipynb) —
   sweep over privacy budget `epsilon` at fixed `q`.
 
 ## Project structure
@@ -159,7 +159,7 @@ src/dimma/
 └── utils/             # Device / misc utilities
 
 tests/                 # Pytest suite (regression vs. reference impls)
-examples/criteo/       # Notebook walkthroughs
+examples/private_spiderboost/       # Notebook walkthroughs
 mkdocs/                # Published documentation source (-> GitHub Pages)
 mkdocs.yml             # MkDocs / Material site configuration
 docs/                  # Agent-facing context (not published)
@@ -173,7 +173,7 @@ docs/                  # Agent-facing context (not published)
   tests against reference implementations).
 - **`examples` extras**: `matplotlib`, `scikit-learn`, `jupyter`
   (needed by the notebooks and plotting utilities in
-  [examples/criteo/](examples/criteo/)).
+  [examples/private_spiderboost/](examples/private_spiderboost/)).
 - **`docs` extras**: `mkdocs`, `mkdocs-material` (needed only to build
   the documentation site in [mkdocs/](mkdocs/) locally).
 

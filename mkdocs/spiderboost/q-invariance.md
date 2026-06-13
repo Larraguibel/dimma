@@ -19,7 +19,7 @@ The result: `params_random` is q-invariant on the set of `q` values where the fi
 
 ## When this bites
 
-The q-sweep notebook in `dimma/examples/criteo/` runs with `T = 200`. The output step `t*` came out to 82. For that run:
+The q-sweep notebook in `dimma/examples/private_spiderboost/notebooks/` runs with `T = 200`. The output step `t*` came out to 82. For that run:
 
 | q | first non-zero anchor | identical to other q? |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ The q-sweep notebook in `dimma/examples/criteo/` runs with `T = 200`. The output
 | 100 | t = 100 | yes |
 | 200 | t = 200 | yes |
 
-`q = 100` and `q = 200` both have their first non-zero anchor at or after `t* = 82`, so `params_random` (and therefore `AUC(w̄)`) is bit-identical between the two. This was first observed as an unexplained 0.6094 AUC collision in the q-sweep; the diagnostic script in `dimma/examples/criteo/diagnose_q_collision.py` confirmed `max|Δ params_random| = 0.0`.
+`q = 100` and `q = 200` both have their first non-zero anchor at or after `t* = 82`, so `params_random` (and therefore `AUC(w̄)`) is bit-identical between the two. This was first observed as an unexplained 0.6094 AUC collision in the q-sweep; the diagnostic script in `dimma/examples/private_spiderboost/scripts/diagnose_q_collision.py` confirmed `max|Δ params_random| = 0.0`.
 
 `params_final = w_T` is **not** subject to this invariance — by step T the trajectories have always diverged, so the final-iterate AUC genuinely depends on `q`.
 

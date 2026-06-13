@@ -16,11 +16,17 @@ The script prints the data; interpretation is manual.
 
 Usage
 -----
-    cd dimma/examples/criteo
-    python3 diagnose_q_collision.py
+    python3 examples/private_spiderboost/scripts/diagnose_q_collision.py
 """
 
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Resolve the example root (contains lib/) so this runs from anywhere.
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / 'lib' / 'model.py').is_file())
+sys.path.insert(0, str(_ROOT / 'lib'))
 
 import jax
 import jax.numpy as jnp
