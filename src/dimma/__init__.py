@@ -10,6 +10,7 @@ from dimma.algorithms.spiderboost import (
     TrainHistory,
     TrainResult,
     StepInfo,
+    resolve_config,
 )
 from dimma.accounting import (
     NoiseScales,
@@ -19,6 +20,7 @@ from dimma.accounting import (
 __all__ = [
     "__version__",
     "train",
+    "resolve_config",
     "TrainConfig",
     "TrainHistory",
     "TrainResult",

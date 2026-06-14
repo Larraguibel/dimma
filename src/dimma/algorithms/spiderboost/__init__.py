@@ -13,6 +13,7 @@ from dimma.algorithms.spiderboost.train import (
     TrainResult,
     StepInfo,
 )
+from dimma.algorithms.spiderboost.config import resolve_config
 
 __all__ = [
     "StepOutput",
@@ -24,4 +25,5 @@ __all__ = [
     "TrainHistory",
     "TrainResult",
     "StepInfo",
+    "resolve_config",
 ]
