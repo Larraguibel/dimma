@@ -45,6 +45,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Generated example figures — rebuilt by notebooks, embedded inline in the .ipynb
+examples/private_spiderboost/figs/
+
 # Pyenv (personal Python version pin)
 .python-version
 
