@@ -44,7 +44,7 @@ specs/              # What to build: one file per topic of concern
 
 - **Never pin the JAX version.** dimma declares only `python >= 3.10`. Users manage their own JAX/CUDA environment. Do not add `jax==x.y.z` to any requirements file.
 - **`src/` layout is intentional.** Do not move modules to the repo root.
-- **Model-agnostic by design.** `train()` accepts any JAX pytree for params and any per-sample loss function. No model-specific logic belongs in `src/dimma/`.
+- **Architecture-agnostic by design.** `train()` accepts any JAX pytree for params and any per-sample loss function — the *algorithm* must not hard-code a specific architecture. This is **not** model-free: dimma ships reference models (Flax/optax are core deps) under `src/dimma/models/` so researchers have a testing model in hand. Model code belongs in `src/dimma/models/`, never in `src/dimma/algorithms/`. See `docs/adr/0002-thm-b3-config-resolver.md` for related structure.
 - **Paper notation in the API.** Parameter names (`L0`, `L1`, `b1`, `b2`, `T`, `q`) follow Arora et al. 2023. Do not rename them to be "clearer".
 - **Three noise scales, not one.** The algorithm requires `σ₁`, `σ₂`, `σ₂_hat`. Any change to noise injection must account for all three. See `CONTEXT.md → noise scale`.
 - **Poisson subsampling is load-bearing for privacy.** The privacy accounting assumes i.i.d. Poisson inclusion. Do not substitute fixed-size batching without a corresponding accounting change.

@@ -85,8 +85,12 @@ _Avoid_: batch fraction, subsample probability
 ## Model interface
 
 **Pytree**
-A JAX-native nested structure of arrays (dicts, lists, tuples of arrays) used to represent model parameters and gradients. dimma operates on arbitrary pytrees — it is model-agnostic.
+A JAX-native nested structure of arrays (dicts, lists, tuples of arrays) used to represent model parameters and gradients. dimma's *algorithm* operates on arbitrary pytrees — it is architecture-agnostic (not tied to any specific network), though the library does ship reference models under `dimma/models/`.
 _Avoid_: parameter dict, weight tensors, model weights
+
+**Reference model**
+A concrete neural network shipped inside the library (`dimma/models/`, e.g. the Flax `MLP`) so researchers have a testing model in hand. Distinct from the architecture-agnostic algorithm, which never depends on one.
+_Avoid_: built-in model, default model, example model
 
 **Per-sample loss function**
 A callable `(params, x_i, y_i) → scalar` that computes the loss for a single example. The user provides this; dimma applies `jax.vmap` internally to vectorize over the batch.
