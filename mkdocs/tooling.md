@@ -1,4 +1,4 @@
-# Jax, Flax and Other DP-SGD Libraries
+# JAX, Flax and Optax Primitives
 
 !!! note
 

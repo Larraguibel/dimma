@@ -24,7 +24,7 @@ extra_css:
 nav:
   - DP-SGD Projects: index.md
   - "Differential Privacy for SGD: Overview": overview.md
-  - Jax, Flax and Other DP-SGD Libraries: tooling.md
+  - JAX, Flax and Optax Primitives: tooling.md
   - "dimma: the library": library.md
   - Algorithms:
       - Algorithms: algorithms/index.md
@@ -33,4 +33,4 @@ nav:
           - Differences between theory and implementation: algorithms/spiderboost/theory-vs-implementation.md
           - "Implementation notes (heuristics, deferred decisions)": algorithms/spiderboost/implementation-notes.md
           - The q-invariance of params_random: algorithms/spiderboost/q-invariance.md
-  - Next steps: next-steps.md
+
