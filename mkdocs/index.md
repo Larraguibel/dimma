@@ -5,7 +5,7 @@ This section documents a research effort to implement and empirically evaluate d
 - [Differential Privacy for SGD: Overview](overview.md)
 - [Jax, Flax and Other DP-SGD Libraries](tooling.md)
 - [dimma: the library](library.md)
-- [Private Spider-Boost](spiderboost/index.md)
+- [Algorithms](algorithms/index.md)
 - [Next steps](next-steps.md)
 
 ## Structure of this section
@@ -16,9 +16,7 @@ This section documents a research effort to implement and empirically evaluate d
 
 - **Differential Privacy for SGD: Overview** — conceptual foundations. Why subsampling matters, what an accountant does, the privacy-utility tradeoff.
 - **Jax, Flax and Other DP-SGD Libraries** — tooling and patterns. The four JAX primitives, NNX, why we don't use Optax for per-sample work, a minimal end-to-end DP-SGD step.
-- **Private Spider-Boost** — first algorithm implemented in dimma.
-    - *Differences between theory and implementation* — gap between Theorem 4.2 and what the code actually does.
-    - *Implementation notes (heuristics, deferred decisions)* — c=1.0, T+1 vs Theorem B.2, the 2·L₀ sensitivity bound, truncated-Poisson accounting, RNG asymmetry.
-    - *The q-invariance of params_random* — algorithmic property worth knowing before interpreting q-sweep plots.
+- **Algorithms** — one page per implemented algorithm, each with theory-vs-implementation gaps, implementation notes, and algorithm-specific properties.
+    - *Private Spider-Boost* — first algorithm implemented in dimma. Includes: gap between Theorem 4.2 and the code, heuristics (c=1.0, T+1, sensitivity bound, truncated-Poisson accounting, RNG asymmetry), and the q-invariance of the random output rule.
 - **dimma: the library** — module map, design conventions, how to add a new algorithm.
 - **Next steps** — running TODO list for the project.

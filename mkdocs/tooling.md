@@ -8,7 +8,7 @@
 
 DP-SGD variants need direct control over primitives that high-level libraries hide or fix. OpenDP and similar libraries, at least up to the date (May 2026)  focus on tabular data DP, not SGD. The ones that do focus on DP-SGD, such as Opacus, Keras-DP, and `optax.contrib.dpsgd` all assume the same rigid pipeline: batch sapling (poisson or shuffling) → per-sample grads → clip to a single norm `C` → average → add Gaussian noise → optimizer update. Anything outside that shape is awkward or impossible to express.
 
-Our algorithms break that shape. For example, **Private SpiderBoost** alternates between two kinds of steps in a single training loop: *anchor* steps that compute a noisy gradient on a large batch, and *variation* steps that update a variance-reduced gradient estimate using the *difference* of gradients across consecutive iterates, with noise scaled to that difference rather than to a fixed sensitivity. Two update rules, two noise scales, one training loop. See [Private Spider-Boost](spiderboost/index.md) for details.
+Our algorithms break that shape. For example, **Private SpiderBoost** alternates between two kinds of steps in a single training loop: *anchor* steps that compute a noisy gradient on a large batch, and *variation* steps that update a variance-reduced gradient estimate using the *difference* of gradients across consecutive iterates, with noise scaled to that difference rather than to a fixed sensitivity. Two update rules, two noise scales, one training loop. See [Private Spider-Boost](algorithms/spiderboost/index.md) for details.
 
 Another example is algorithms that require truncated Poisson subsampling. In standard Poisson subsampling, each example is included in a batch independently with probability *p,* making the batch size random. Truncated Poisson adds a cap: if the drawn batch exceeds a maximum size, it is subsampled down to that cap. Applying this cap means intervening inside the batch construction step. A premade batch-handling function does not expose that step, so the only options are to wrap it (paying redundant computation) or to reimplement it. This is why the sampling procedure needs to be written into our own training loop rather than delegated to a library.
 
@@ -258,7 +258,7 @@ Every variant in the project modifies one or more of these five steps. SpiderBoo
 - Flax NNX: [flax.readthedocs.io/en/latest/api_reference/flax.nnx](http://flax.readthedocs.io/en/latest/api_reference/flax.nnx)
 - Optax: [optax.readthedocs.io](http://optax.readthedocs.io)
 - DP context for this project: [Differential Privacy for SGD: Overview](overview.md)
-- A concrete worked example: [Private Spider-Boost](spiderboost/index.md)
+- A concrete worked example: [Private Spider-Boost](algorithms/spiderboost/index.md)
 
 Privacy accounting is not covered here. Accounting decisions (which accountant, sampling-amplification assumptions, composition) live with the algorithm-specific pages.
 

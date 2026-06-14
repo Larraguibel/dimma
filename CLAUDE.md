@@ -30,8 +30,15 @@ examples/private_spiderboost/    # Private SpiderBoost demos: notebooks/, lib/ (
 docs/
   adr/              # Architecture Decision Records — hard-to-reverse, non-obvious choices
   agents/           # Agent skill documentation (issue tracker, triage, domain)
+  writing-guide.md  # Rules for writing mkdocs pages — read before editing mkdocs/
+mkdocs/             # Published documentation site
+  algorithms/       # One folder per implemented algorithm
 specs/              # What to build: one file per topic of concern
 ```
+
+## Documentation
+
+**Before editing any file under `mkdocs/`, read `docs/writing-guide.md`.** It defines the rules for notation, page scope, admonitions, and where to put new content.
 
 ## Key conventions
 

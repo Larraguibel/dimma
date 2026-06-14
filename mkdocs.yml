@@ -26,9 +26,11 @@ nav:
   - "Differential Privacy for SGD: Overview": overview.md
   - Jax, Flax and Other DP-SGD Libraries: tooling.md
   - "dimma: the library": library.md
-  - Private Spider-Boost:
-      - Private Spider-Boost: spiderboost/index.md
-      - Differences between theory and implementation: spiderboost/theory-vs-implementation.md
-      - "Implementation notes (heuristics, deferred decisions)": spiderboost/implementation-notes.md
-      - The q-invariance of params_random: spiderboost/q-invariance.md
+  - Algorithms:
+      - Algorithms: algorithms/index.md
+      - Private Spider-Boost:
+          - Private Spider-Boost: algorithms/spiderboost/index.md
+          - Differences between theory and implementation: algorithms/spiderboost/theory-vs-implementation.md
+          - "Implementation notes (heuristics, deferred decisions)": algorithms/spiderboost/implementation-notes.md
+          - The q-invariance of params_random: algorithms/spiderboost/q-invariance.md
   - Next steps: next-steps.md

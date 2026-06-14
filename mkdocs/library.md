@@ -112,7 +112,7 @@ The library is set up so a second algorithm is a self-contained addition, not a 
 3. **Write the training loop in `train.py`.** Follow the Spider-Boost pattern: a `TrainConfig`, a `StepInfo`-like NamedTuple if your algorithm has interesting per-step state, a `TrainResult`. The loop takes `per_sample_loss_fn` and `init_params` as required arguments. It uses `dimma.core.sampling` for subsampling. It does not do evaluation or printing.
 4. **Write an accounting module under `dimma/accounting/<name>.py`** (or place generic sampling-based accounting in `dimma.accounting.sampling` if it already covers your case). Algorithm-specific accountants belong with their algorithm.
 5. **Test against a synthetic problem.** A 2-parameter linear model on a few dozen examples is enough. Verify the kernels do what they're supposed to with `sigma=0` (deterministic baseline) and with the actual noise.
-6. **Document the paper-vs-implementation differences** under the algorithm's Notion page, mirroring [Differences between theory and implementation](spiderboost/theory-vs-implementation.md) for Spider-Boost.
+6. **Document the paper-vs-implementation differences** under the algorithm's Notion page, mirroring [Differences between theory and implementation](algorithms/spiderboost/theory-vs-implementation.md) for Spider-Boost.
 7. **Do not** add the algorithm to `dimma.__init__.py` until the public API is stable. Keep it accessible at `dimma.algorithms.<name>.train` until you're confident in the surface.
 
 The second algorithm is the real test of whether `core/` was structured correctly. If you find yourself reimplementing primitives or copy-pasting from `algorithms/spiderboost/`, the abstraction is wrong and `core/` needs to grow. That's expected and fine — it's why the project's design principle is "implement two concrete algorithms fully before extracting shared abstractions."
@@ -129,4 +129,4 @@ Things that are *not* known to be wrong but are also not yet pinned down:
 
 - DP background: [Differential Privacy for SGD: Overview](overview.md)
 - JAX / Flax / Optax patterns the library codifies: [Jax, Flax and Other DP-SGD Libraries](tooling.md)
-- First algorithm implemented in dimma: [Private Spider-Boost](spiderboost/index.md)
+- First algorithm implemented in dimma: [Private Spider-Boost](algorithms/spiderboost/index.md)
