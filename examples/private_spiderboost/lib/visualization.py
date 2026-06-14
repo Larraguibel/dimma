@@ -204,7 +204,8 @@ def plot_auc_history(eval_steps: Sequence[int], eval_auc: Sequence[float],
 def plot_epsilon_sweep(epsilons: Sequence[float],
                        auc_random: Sequence[float],
                        auc_final: Sequence[float],
-                       save_path: str | Path) -> plt.Figure:
+                       save_path: str | Path,
+                       auc_baseline: float | None = None) -> plt.Figure:
     """Plot test ROC-AUC vs. privacy budget ε (privacy-utility tradeoff).
 
     Parameters
@@ -218,6 +219,10 @@ def plot_epsilon_sweep(epsilons: Sequence[float],
         Test ROC-AUC of the final iterate ``w_T``, aligned with ``epsilons``.
     save_path : str or pathlib.Path
         Output PNG location.
+    auc_baseline : float or None, default None
+        Test ROC-AUC of the non-private SPIDER baseline (horizontal reference
+        line). When provided, draws a dashed red line labeled
+        "non-private baseline". When ``None``, the plot is unchanged.
 
     Returns
     -------
@@ -229,6 +234,9 @@ def plot_epsilon_sweep(epsilons: Sequence[float],
             label=r"$\bar w$ (random iterate)")
     ax.plot(epsilons, auc_final, marker="s", lw=1.4, color="tab:blue",
             label=r"$w_T$ (final iterate)")
+    if auc_baseline is not None:
+        ax.axhline(auc_baseline, ls="--", lw=1.2, color="tab:red",
+                   label="non-private baseline")
     ax.set_xscale("log")
     ax.set_xlabel(r"Privacy budget $\varepsilon$ (log scale)")
     ax.set_ylabel("Test ROC-AUC")
