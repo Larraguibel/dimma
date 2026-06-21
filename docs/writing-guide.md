@@ -66,10 +66,11 @@ mkdocs/
 ```
 
 When adding a new algorithm:
-1. Create `mkdocs/algorithms/<name>/index.md` with a one-sentence description and the `dimma` entry point.
-2. Add a row to `mkdocs/algorithms/index.md`.
-3. Add the algorithm to the `nav` in `mkdocs.yml` under the `Algorithms` section.
-4. Update `mkdocs/index.md` → "Structure of this section" to mention it.
+1. Create the algorithm's glossary at `docs/glossaries/<name>.md` (per `docs/agents/domain.md`) and add a row to the table in `CONTEXT.md → Algorithm-specific glossaries`. The narrative pages below *explain* those terms; they do not redefine them.
+2. Create `mkdocs/algorithms/<name>/index.md` with a one-sentence description and the `dimma` entry point.
+3. Add a row to `mkdocs/algorithms/index.md`.
+4. Add the algorithm to the `nav` in `mkdocs.yml` under the `Algorithms` section.
+5. Update `mkdocs/index.md` → "Structure of this section" to mention it.
 
 ---
 

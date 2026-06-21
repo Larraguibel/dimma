@@ -4,26 +4,37 @@ JAX-based library of differentially private optimization algorithms.
 
 ## Overview
 
-`dimma` implements differentially private stochastic optimization
-algorithms with composable privacy accounting. The current release
-focuses on Private SpiderBoost (Arora et al., ICML 2023), a
-variance-reduced DP-SGD variant.
+`dimma` is a framework for building differentially private stochastic
+optimization algorithms: a set of shared, architecture-agnostic
+primitives (per-sample clipping, Gaussian noise, Poisson subsampling)
+plus privacy accounting, with each algorithm implemented as a thin
+layer on top. The first algorithm implemented is Private SpiderBoost
+(Arora et al., ICML 2023), a variance-reduced DP-SGD variant.
 
-Highlights:
+Shared foundation (used by every algorithm):
 
-- **Private SpiderBoost (Algorithm 2 of Arora et al. 2023)** with
-  JIT-compiled anchor / variation step kernels.
-- **Poisson subsampling** with both the standard rejection-on-oversize
-  and a truncated heuristic variant.
-- **Privacy accounting** via Google's `dp-accounting` (RDP), exposed as
-  a single `compute_noise_scales(epsilon, delta, ...)` call that
-  returns the `(sigma1, sigma2, sigma2_hat)` triple the loop needs.
-- **Model-agnostic training loop.** `train` takes a
+- **Architecture-agnostic training.** An algorithm takes a
   `per_sample_loss_fn` and an `init_params` pytree; the library does
   no model construction, no metric computation, and no I/O. Evaluation
   and bookkeeping live in user code via a per-step callback.
+- **Per-sample DP primitives** (`dimma.core`): per-sample clipping,
+  Gaussian noise injection, and pytree arithmetic, reused across
+  algorithms rather than reimplemented per algorithm.
+- **Poisson subsampling** with both the standard rejection-on-oversize
+  and a truncated heuristic variant.
+- **Privacy accounting** via Google's `dp-accounting` (RDP). Generic
+  sampling-based accountants are reusable; algorithm-specific
+  accountants live with their algorithm.
 - **Dataset loaders** (`dimma.datasets.load_criteo`, ...) with on-disk
   caching, checksum verification, and license attribution.
+
+Implemented algorithms:
+
+- **Private SpiderBoost (Algorithm 2 of Arora et al. 2023)** with
+  JIT-compiled anchor / variation step kernels and a
+  `compute_noise_scales(epsilon, delta, ...)` call that returns the
+  `(sigma1, sigma2, sigma2_hat)` triple the loop needs. Entry point:
+  `dimma.train`.
 
 Status: `0.1.0`. The public API may change before `1.0`.
 
@@ -40,14 +51,18 @@ and covers:
   non-standard DP-SGD variants, and why off-the-shelf libraries don't fit.
 - **The dimma library** — module map, design conventions, and how to add
   a new algorithm.
-- **Private SpiderBoost** — the implemented algorithm, the gaps between
-  the paper's theory and the code, implementation heuristics, and the
-  `q`-invariance of the random-output iterate.
+- **Private SpiderBoost** — the first implemented algorithm: the gaps
+  between the paper's theory and the code, implementation heuristics,
+  and the `q`-invariance of the random-output iterate.
 
 The documentation source lives in [`mkdocs/`](mkdocs/); `docs/` is
 reserved for agent-facing context and is not part of the published site.
 
 ## Quickstart
+
+The example below trains Private SpiderBoost, the first algorithm in
+dimma; `dimma.train` is its entry point. Future algorithms expose their
+own entry point under `dimma.algorithms.<name>.train`.
 
 ```python
 import jax.numpy as jnp
@@ -241,7 +256,7 @@ Update the author list and paper reference once a companion preprint is posted.
 
 Before opening an issue or sending a PR, read:
 
-- [`CONTEXT.md`](CONTEXT.md) — domain language glossary; use these terms in code, comments, and issues
+- [`CONTEXT.md`](CONTEXT.md) — universal DP-SGD glossary; use these terms in code, comments, and issues. Per-algorithm vocabulary lives under [`docs/glossaries/`](docs/glossaries/)
 - [`CLAUDE.md`](CLAUDE.md) — build/test commands, conventions, and learned rules for AI agents
 - [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) — how issues are filed and triaged
 - [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md) — label vocabulary and when to apply each

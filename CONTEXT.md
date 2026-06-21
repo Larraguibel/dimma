@@ -1,7 +1,15 @@
 # dimma — Domain Language
 
-This file is the **ubiquitous language glossary** for the dimma project.
-One term per concept. Use these names — and only these names — in code, comments, issues, and prompts.
+This file is the **universal glossary** for the dimma project: the terms shared by
+*every* differentially private optimization algorithm in the library.
+One term per concept. Use these names — and only these names — in code, comments,
+issues, and prompts.
+
+Terms specific to a single algorithm (its step structure, its noise-scale layout,
+its public entry point) do **not** live here. They live in a per-algorithm glossary
+under `docs/glossaries/`. See [Algorithm-specific glossaries](#algorithm-specific-glossaries)
+at the bottom.
+
 No implementation details, no specs, no scratch pad.
 
 ---
@@ -17,47 +25,19 @@ The total allowable (ε, δ) expenditure across all training rounds. Once consum
 _Avoid_: privacy cost, epsilon budget, DP budget
 
 **Rényi Differential Privacy (RDP)**
-An intermediate privacy accounting framework (parameterized by order α) that composes tightly across rounds and converts to (ε, δ)-DP at the end. Used internally by `compute_noise_scales`.
+An intermediate privacy accounting framework (parameterized by order α) that composes tightly across rounds and converts to (ε, δ)-DP at the end. Used internally by the accounting layer when an algorithm calibrates its noise.
 _Avoid_: moment accountant, RDP accounting, Rényi DP
 
 **Privacy accounting**
-The process of tracking cumulative privacy loss across training steps. In dimma this is delegated to Google's `dp-accounting` library.
+The process of tracking cumulative privacy loss across training steps. In dimma this is delegated to Google's `dp-accounting` library. Each algorithm injects its own accountant.
 _Avoid_: privacy tracking, epsilon tracking
-
----
-
-## Training structure
-
-**Phase**
-One complete cycle of one anchor step followed by `q` variation steps. The unit of iteration in Private SpiderBoost.
-_Avoid_: epoch, round, cycle
-
-**Phase length (q)**
-The number of variation steps per anchor step within one phase. A key hyperparameter: larger `q` amortizes the cost of the anchor step but increases variance accumulation.
-_Avoid_: steps per phase, inner loop count, q parameter
-
-**Anchor step**
-The step within a phase that computes a full gradient at the current reference point, establishing the variance-reduction baseline. Corresponds to the SPIDER "snapshot" computation.
-_Avoid_: snapshot step, reference computation, full-batch step, outer step
-
-**Variation step**
-Each of the `q` lightweight steps within a phase that uses a stochastic gradient estimator corrected by the anchor-step baseline. Cheaper per step than an anchor step.
-_Avoid_: inner step, correction step, SPIDER step
-
-**Final iterate**
-The model parameters at the end of the last variation step — the last point in the trajectory. Returned as `TrainResult.params_final`.
-_Avoid_: last checkpoint, terminal parameters
-
-**Random iterate**
-A uniformly sampled intermediate iterate from the training trajectory. This is the iterate with the formal (ε, δ)-DP convergence guarantee. Returned as `TrainResult.params_random`.
-_Avoid_: random checkpoint, sampled params, output with guarantee
 
 ---
 
 ## Noise and clipping
 
 **Noise scale (σ)**
-A scalar multiplier on the Gaussian noise added to a gradient. dimma uses three: `σ₁` (anchor step), `σ₂` (variation step), `σ₂_hat` (bias correction term). Calibrated by `compute_noise_scales` to satisfy the privacy budget.
+A scalar multiplier on the Gaussian noise added to a gradient, calibrated to satisfy the privacy budget. How many noise scales an algorithm uses, and what each one protects, is algorithm-specific — see the relevant per-algorithm glossary.
 _Avoid_: noise multiplier, sigma, standard deviation
 
 **Per-sample gradient clipping**
@@ -65,7 +45,7 @@ Bounding each individual sample's gradient to L2-norm ≤ C before aggregation. 
 _Avoid_: gradient clipping, norm clipping, clip
 
 **Clipping threshold (C)**
-The maximum L2 norm allowed for a per-sample gradient. Denoted `L0` (anchor) and `L1` (variation) in the API, following the paper's notation.
+The maximum L2 norm allowed for a per-sample gradient. An algorithm may use more than one clipping threshold (e.g. a distinct bound per kind of step); the per-algorithm glossary names them.
 _Avoid_: clip norm, max gradient norm
 
 ---
@@ -77,19 +57,31 @@ Selecting each training example independently with probability `q` (the sampling
 _Avoid_: random sampling, batch sampling, q-sampling
 
 **Sampling rate (q)**
-The per-example inclusion probability for Poisson subsampling. Not to be confused with phase length `q` — they share notation in the paper but are the same hyperparameter (they are linked in the `TrainConfig`).
+The per-example inclusion probability for Poisson subsampling.
 _Avoid_: batch fraction, subsample probability
+
+---
+
+## Training output
+
+**Final iterate**
+The model parameters at the end of the last step — the last point in the trajectory.
+_Avoid_: last checkpoint, terminal parameters
+
+**Random iterate**
+A uniformly sampled intermediate iterate from the training trajectory. In several DP optimization algorithms this — rather than the final iterate — is the point carrying the formal (ε, δ)-DP convergence guarantee. Each algorithm's glossary names how it is returned.
+_Avoid_: random checkpoint, sampled params, output with guarantee
 
 ---
 
 ## Model interface
 
 **Pytree**
-A JAX-native nested structure of arrays (dicts, lists, tuples of arrays) used to represent model parameters and gradients. dimma's *algorithm* operates on arbitrary pytrees — it is architecture-agnostic (not tied to any specific network), though the library does ship reference models under `dimma/models/`.
+A JAX-native nested structure of arrays (dicts, lists, tuples of arrays) used to represent model parameters and gradients. dimma's *algorithms* operate on arbitrary pytrees — they are architecture-agnostic (not tied to any specific network), though the library does ship reference models under `dimma/models/`.
 _Avoid_: parameter dict, weight tensors, model weights
 
 **Reference model**
-A concrete neural network shipped inside the library (`dimma/models/`, e.g. the Flax `MLP`) so researchers have a testing model in hand. Distinct from the architecture-agnostic algorithm, which never depends on one.
+A concrete neural network shipped inside the library (`dimma/models/`, e.g. the Flax `MLP`) so researchers have a testing model in hand. Distinct from the architecture-agnostic algorithms, which never depend on one.
 _Avoid_: built-in model, default model, example model
 
 **Per-sample loss function**
@@ -98,19 +90,18 @@ _Avoid_: loss function, batch loss, objective
 
 ---
 
-## Public API surface
+## Algorithm-specific glossaries
 
-**`train()`**
-The single entry point for running Private SpiderBoost. Takes data, a per-sample loss function, initial params, a config, and noise scales. Returns a `TrainResult`.
+The terms above are common to all DP-SGD variants. Each algorithm additionally
+defines its own vocabulary — step names, noise-scale structure, hyperparameters,
+and public entry point — in its own glossary. A per-algorithm glossary is the
+canonical naming contract for that algorithm, the same way this file is for the
+shared language; the algorithm's pages under `mkdocs/algorithms/` *explain* it,
+they do not redefine it.
 
-**`TrainConfig`**
-A dataclass holding all hyperparameters: ε, δ, L0, L1, T (total phases), q (phase length / sampling rate), b1 (anchor batch size), b2 (variation batch size), η (learning rate), seed.
+| Algorithm | Glossary |
+|---|---|
+| Private SpiderBoost | [`docs/glossaries/spiderboost.md`](docs/glossaries/spiderboost.md) |
 
-**`TrainResult`**
-The output of `train()`: contains `params_final`, `params_random`, and `history`.
-
-**`compute_noise_scales()`**
-Calibrates the three noise scales (σ₁, σ₂, σ₂_hat) from the privacy budget and training config using RDP accounting. Must be called before `train()`.
-
-**`NoiseScales`**
-A named triple `(σ₁, σ₂, σ₂_hat)` returned by `compute_noise_scales()`.
+When you implement a new algorithm, add a glossary under `docs/glossaries/<name>.md`
+and a row to this table. See `docs/agents/domain.md` for the layout rules.
