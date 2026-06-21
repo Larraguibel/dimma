@@ -66,8 +66,10 @@ The $O(\cdot)$ suppresses an unknown universal constant $C$. This notebook:
   empirical $C$ for *this* Criteo instantiation. A large $C \gg 1$ is the
   scientifically expected outcome (see the closing **Limitations** section) and
   does **not** falsify the theorem.
-- It uses **default hyperparameters** (`b1 << n`, `q` not derived from the
-  proof). The paper's tightest rate uses `b1 = n`; here `b1 = 8192`.
+- It derives `eta`, `q`, and `b2` from **Theorem B.3** (via `resolve_config`),
+  so the swept instance is the one the proof actually analyses — `q` is no longer
+  hand-set. The remaining off-theory choice is `b1 = 8192` (the paper's tightest
+  rate uses `b1 = n`).
 - It covers only the **empirical** risk (Theorem 4.2), not population risk
   (Theorem 4.3).
 
@@ -98,7 +100,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 
 import dimma
-from dimma import TrainConfig, compute_noise_scales
+from dimma import TrainConfig, compute_noise_scales, resolve_config
 from dimma.datasets import load_criteo
 from dimma.core.pytree import (
     pytree_add,
@@ -116,7 +118,19 @@ md("""
 
 The cleanest axis for verifying Theorem 4.2 is $\\varepsilon$, because the
 rate's $\\varepsilon$-dependence is explicit: term 1 $\\propto \\varepsilon^{-2/3}$,
-term 2 $\\propto \\varepsilon^{-1}$. All other hyperparameters are held constant.
+term 2 $\\propto \\varepsilon^{-1}$.
+
+**Hyperparameters follow the proof, not a fixed default.** `eta`, `q`, and `b2`
+are derived per-$\\varepsilon$ from Theorem B.3 by `resolve_config` (section 4b),
+so each swept point is the algorithm instance the analysis covers. Only `L0`,
+`L1`, `b1`, and `T` are caller-set. Because `resolve_config` *raises* once the
+instance leaves the proof regime — with the Criteo scale, staying in-regime needs
+$T \\gtrsim n\\varepsilon / (L_1\\sqrt{d\\log(1/\\delta)}) \\approx 767\\,\\varepsilon$
+— we fix **`T = 2000`** so the whole sweep (up to $\\varepsilon=2$, where
+$q\\approx1176$) stays in-regime with margin. The alternative, restricting
+$\\varepsilon$ to $\\lesssim 0.26$ at the old `T=200`, would collapse the sweep to
+under half a decade and make the log-log slope uninformative; we keep the full
+$\\varepsilon$ range and pay the larger-$T$ compute instead.
 
 **On `d`:** Theorem 4.2's `d` is the optimization problem dimension, i.e. the
 number of **model parameters** ($\\approx 3{,}201$ for `HIDDEN_DIMS=(64,32)` on
@@ -128,7 +142,17 @@ code(r'''
 FIGS_DIR = ROOT / 'figs'
 FIGS_DIR.mkdir(exist_ok=True)
 
-data = load_criteo(features='integer', test_fraction=0.2, seed=0, device='cpu')
+# Prefer the GPU when a CUDA/ROCm/Metal jaxlib is installed; fall back to CPU.
+# dimma never pins JAX (see CLAUDE.md), so GPU availability is an environment
+# choice — this keeps the notebook portable across CPU and GPU servers.
+try:
+    jax.devices('gpu')
+    DEVICE = 'gpu'
+except RuntimeError:
+    DEVICE = 'cpu'
+print(f'JAX backend: {jax.default_backend()}   data device: {DEVICE}')
+
+data = load_criteo(features='integer', test_fraction=0.2, seed=0, device=DEVICE)
 x_train, y_train = data.x_train, data.y_train
 n_train, d_features = x_train.shape
 
@@ -139,10 +163,14 @@ SEEDS = list(range(N_SEEDS))
 
 HIDDEN_DIMS = (64, 32)
 
-# Held-constant algorithm/privacy hyperparameters.
+# Caller-set hyperparameters. eta, q, b2 are NOT set here: they are derived
+# per-epsilon from Theorem B.3 by resolve_config (section 4b). T is fixed at
+# 2000 so the whole eps sweep stays inside the proof regime (q <= T); b1=8192
+# stays off-theory (the paper's tightest rate uses b1=n).
 L0 = 3.0
 L1 = 5.0
-BASE = dict(L0=L0, L1=L1, T=200, q=30, b1=8192, b2=512, eta=0.01)
+T = 2000
+B1 = 8192
 
 # delta = 1/n is the standard "less than one over dataset size" choice; it
 # feeds both compute_noise_scales and the log(1/delta) factor in the bound.
@@ -290,34 +318,92 @@ print(f'(per-seed F(w0;S): {[round(v, 4) for v in F0_per_seed]})')
 ''')
 
 # ---------------------------------------------------------------------------
-md("""
+md(r"""
+## 4b. Proof-prescribed hyperparameters per $\varepsilon$ (Theorem B.3)
+
+`resolve_config` derives $\eta = 1/(2L_1)$,
+$q = \lfloor n^2\varepsilon^2 / (L_1^2\,T\,d\,\log(1/\delta)) \rfloor$, and the
+two-term $b_2$ of Theorem B.3, returning a concrete `TrainConfig`. It **raises**
+if the instance leaves the stated regime (`q > T`, `b2 > n`, or `n < n_min`), so
+a clean pass here is itself the in-regime guarantee for the chosen `T = 2000`.
+
+`eta`, `q`, and `b2` depend only on $\varepsilon$ (not the seed), so we resolve
+once per $\varepsilon$ and reuse the structural values for both the non-private
+baseline (section 5) and the private sweep (section 6); only `seed` is swapped in
+per run.
+
+Note the phase count $T/q$ varies sharply across the sweep — many short phases at
+small $\varepsilon$, near a single long phase at $\varepsilon=2$ — because
+$q\propto\varepsilon^2$ with $T$ fixed. That variation *is* the Theorem B.3
+instance, not an artefact.
+""")
+
+code(r'''
+# eta, q, b2 are seed-independent -> resolve once per eps (using F0_upper and the
+# probe params for the dimension d), reuse the structural values everywhere.
+resolved = {}
+for eps in EPSILONS:
+    resolved[eps] = resolve_config(
+        _probe_params, n_train, F0_upper,
+        epsilon=eps, delta=DELTA, L0=L0, L1=L1, T=T, b1=B1, seed=0,
+    )
+
+print(f"\n{'eps':>6} {'eta':>8} {'q':>8} {'b2':>10} {'T/q phases':>12}")
+for eps in EPSILONS:
+    c = resolved[eps]
+    print(f'{eps:6.1f} {c.eta:8.4f} {c.q:8d} {c.b2:10d} {T / c.q:12.2f}')
+
+# Spot-checks (in the spirit of section 3a): the decision that defines this
+# notebook is that the whole sweep stays in-regime at T=2000. resolve_config
+# already raises out-of-regime, so reaching here means q<=T for all eps; we also
+# assert the structural shape of the derived values.
+assert all(resolved[e].q <= T for e in EPSILONS), 'q > T: out of Theorem B.3 regime'
+assert all(resolved[e].b2 <= n_train for e in EPSILONS), 'b2 > n: out of regime'
+assert all(abs(resolved[e].eta - 1.0 / (2.0 * L1)) < 1e-12 for e in EPSILONS), \
+    'eta must equal 1/(2 L1)'
+_qs = [resolved[e].q for e in EPSILONS]
+assert _qs == sorted(_qs), f'q must be non-decreasing in eps, got {_qs}'
+# q grows ~ eps^2: doubling eps from 1.0 to 2.0 should ~quadruple q.
+assert 3.0 < resolved[2.0].q / max(resolved[1.0].q, 1) < 5.0, \
+    'q should scale ~ eps^2 between eps=1 and eps=2'
+print('\nin-regime OK: q<=T and b2<=n for all eps; eta=1/(2 L1); q monotone, ~eps^2')
+''')
+
+# ---------------------------------------------------------------------------
+md(r"""
 ## 5. Non-private SPIDER baseline
 
 `model.train_spider` runs non-private SPIDER with the **same** anchor/variation
 structure and the **same** random-output-step rule as the DP loop, so its
-`params_random` is directly comparable. This quantifies the cost of differential
-privacy on stationarity.
+`params_random` is directly comparable. We run it with the **same
+proof-prescribed `q`, `b2`, `eta` per $\varepsilon$** as the private sweep, so the
+baseline isolates the cost of differential privacy under an identical structural
+choice (rather than confounding it with a different phase schedule).
 """)
 
 code(r'''
-print('Training non-private SPIDER baseline...')
-baseline_norms = []
-for seed in SEEDS:
-    init_p = model.init_params(
-        jax.random.PRNGKey(seed), input_dim=d_features, hidden_dims=HIDDEN_DIMS
-    )
-    res_np = model.train_spider(
-        x_train, y_train, init_params=init_p,
-        T=BASE['T'], q=BASE['q'], b1=BASE['b1'], b2=BASE['b2'],
-        eta=BASE['eta'], seed=seed,
-    )
-    gn = compute_true_grad_norm(res_np.params_random, x_train, y_train)
-    baseline_norms.append(gn)
-    print(f'  seed={seed}  t*={res_np.history.output_step:3d}  '
-          f'||nabla F(w*)||={gn:.4e}  ({sum(res_np.history.wall_time_s):.1f}s)')
+print('Training non-private SPIDER baseline (per-eps proof-prescribed q/b2/eta)...')
+baseline_norms = {eps: [] for eps in EPSILONS}
+for eps in EPSILONS:
+    c = resolved[eps]
+    print(f'--- eps = {eps}  (q={c.q}, b2={c.b2}, eta={c.eta:.3f}) ---')
+    for seed in SEEDS:
+        init_p = model.init_params(
+            jax.random.PRNGKey(seed), input_dim=d_features, hidden_dims=HIDDEN_DIMS
+        )
+        res_np = model.train_spider(
+            x_train, y_train, init_params=init_p,
+            T=c.T, q=c.q, b1=c.b1, b2=c.b2, eta=c.eta, seed=seed,
+        )
+        gn = compute_true_grad_norm(res_np.params_random, x_train, y_train)
+        baseline_norms[eps].append(gn)
+        print(f'  seed={seed}  t*={res_np.history.output_step:3d}  '
+              f'||nabla F(w*)||={gn:.4e}  ({sum(res_np.history.wall_time_s):.1f}s)')
 
-baseline_mean = float(np.mean(baseline_norms))
-print(f'Non-private baseline true grad norm (mean over {N_SEEDS} seeds): {baseline_mean:.4e}')
+baseline_mean = np.array([float(np.mean(baseline_norms[e])) for e in EPSILONS])
+print('\nNon-private baseline true grad norm (mean over seeds), per eps:')
+for e, m in zip(EPSILONS, baseline_mean):
+    print(f'  eps={e:5.1f}  {m:.4e}')
 ''')
 
 # ---------------------------------------------------------------------------
@@ -341,9 +427,10 @@ output_steps = {eps: [] for eps in EPSILONS}
 single_run = {}  # representative run for the noisy-vs-true visualization
 
 for eps in EPSILONS:
-    print(f'--- eps = {eps} ---')
+    print(f'--- eps = {eps}  (q={resolved[eps].q}, b2={resolved[eps].b2}) ---')
     for seed in SEEDS:
-        cfg = TrainConfig(epsilon=eps, delta=DELTA, seed=seed, **BASE)
+        # Proof-prescribed config for this eps; only the seed varies per run.
+        cfg = resolved[eps]._replace(seed=seed)
         noise_scales = compute_noise_scales(
             L0=cfg.L0, L1=cfg.L1, epsilon=cfg.epsilon, delta=cfg.delta,
             T=cfg.T, q=cfg.q, n=n_train, b1=cfg.b1, b2=cfg.b2,
@@ -480,7 +567,9 @@ Fit $\log(\text{mean\_norm}) = \text{slope}\cdot\log(\varepsilon) + \text{interc
 via `numpy.polyfit`. The theoretical prediction lies between $-2/3$ (term 1
 dominates) and $-1$ (term 2 dominates). For the Criteo regime the two terms are
 comparable near $\varepsilon=1$, so the expected slope is roughly $-0.75$ to
-$-0.85$.
+$-0.85$. Now that $q$ is proof-prescribed (rather than the old hand-set
+$q=30$), whether the empirical slope moves toward this range is the central
+question this notebook is meant to answer — we report it without pre-judging.
 """)
 
 code(r'''
@@ -578,9 +667,9 @@ ax.plot(eps_dense, C_fit * t2_dense, ':', color='C2', lw=1.5,
 ax.plot(eps_dense, C_fit * (t1_dense_a + t2_dense_a), '-', color='0.6', lw=1,
         alpha=0.8, label='fitted curve under $F_0 - 0.4$')
 
-# Non-private baseline.
-ax.axhline(baseline_mean, color='k', ls='-.', lw=1.2,
-           label=f'non-private SPIDER ({baseline_mean:.2e})')
+# Non-private baseline, per-eps (same proof-prescribed q/b2/eta as the DP runs).
+ax.plot(eps_arr, baseline_mean, 's-.', color='k', lw=1.2, ms=6,
+        label='non-private SPIDER (per-$\\varepsilon$)')
 
 ax.set_xscale('log'); ax.set_yscale('log')
 ax.set_xlabel('privacy budget $\\varepsilon$')
@@ -654,7 +743,9 @@ print(f'true norm at t*: {sr["true_norm"]:.4e}   '
 md(r"""
 ## 9. Limitations — what this notebook cannot conclude
 
-This comparison is **diagnostic**, not a proof check. Specifically:
+This comparison is **diagnostic**, not a proof check. `eta`, `q`, and `b2` are
+now proof-derived (Theorem B.3, via `resolve_config`), so the earlier "$q$ is
+hand-set" caveat no longer applies. The remaining limitations are:
 
 1. **The constant $C$ is unknown and fitted, not derived.** $C \gg 1$ is the
    scientifically valid outcome. The proof's $O(\cdot)$ suppresses constants
@@ -666,22 +757,21 @@ This comparison is **diagnostic**, not a proof check. Specifically:
 
 2. **$b_1 \ll n$.** With `b1=8192` against $n\approx 8\times10^5$, the anchor
    batch is a small fraction of the data — the bound's optimal-$b_1$ assumption
-   does not hold.
+   does not hold. This is the one structural parameter still off-theory.
 
-3. **$q$ is not derived from the proof.** We use the default `q=30` rather than
-   the phase length the analysis would prescribe.
-
-4. **$F_0$ is approximate.** We report both $F(w_0;S)$ (upper bound, $F^*=0$)
+3. **$F_0$ is approximate.** We report both $F(w_0;S)$ (upper bound, $F^*=0$)
    and $F(w_0;S)-0.4$ (approx. Criteo min BCE). The true suboptimality lies
    between.
 
-5. **Empirical risk only.** This is Theorem 4.2; population-risk convergence
+4. **Empirical risk only.** This is Theorem 4.2; population-risk convergence
    (Theorem 4.3) is out of scope.
 
-6. **$T$ is fixed, not swept.** The theorem's rate is derived after optimizing
-   $T$; with fixed batch sizes the default `compute_noise_scales` produces noise
-   scales constant in $T$, so sweeping $T$ would not trace the theorem's
-   $T$-dependence. See the issue's *Out of Scope* notes.
+5. **$T$ is fixed, not jointly optimised with $q$.** Theorem B.3 also prescribes
+   a $T$; for the Criteo scale that is computationally impractical (tens of
+   thousands of phases). We fix `T = 2000` as a budget choice — chosen large
+   enough to keep the whole $\varepsilon$ sweep inside the proof regime
+   ($q \le T$) — and derive $q$, $b_2$, $\eta$ against it, rather than jointly
+   optimising $(T, q)$. That joint optimisation is a separate experiment.
 
 The headline takeaways are therefore the **shape** (log-log slope vs. the
 $-2/3 \to -1$ prediction) and the **fitted $C$ with its uncertainty**, read
