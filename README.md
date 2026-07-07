@@ -113,34 +113,91 @@ See [examples/private_spiderboost/](examples/private_spiderboost/) for runnable 
 
 ## Installation
 
-Base install (library only):
+dimma requires **Python ≥ 3.10**. Installation is two steps: first
+install JAX for your hardware, then install dimma with the extras for
+what you intend to do.
+
+We recommend a fresh virtual environment:
 
 ```bash
-pip install -e .
+git clone https://github.com/Larraguibel/dimma.git
+cd dimma
+python -m venv .venv && source .venv/bin/activate
 ```
 
-To also run the test suite, install the `dev` extras:
+### Step 1 — Install JAX for your hardware
+
+dimma **never pins JAX** (see [JAX Version](#jax-version)), so you choose
+the build that matches your machine. Install it *before* dimma.
 
 ```bash
-pip install -e ".[dev]"
+# CPU only (works everywhere)
+pip install -U jax
+
+# NVIDIA GPU, CUDA 12 (see GPU setup below)
+pip install -U "jax[cuda12]"
 ```
 
-To run the notebooks under [examples/](examples/) (e.g. the Criteo
-experiments), install the `examples` extras:
+For TPU, AMD ROCm, or Apple Metal, follow the
+[JAX installation guide](https://github.com/google/jax#installation).
+
+### Step 2 — Install dimma for your use case
+
+The three common setups install different extras — pick the row that
+matches what you're doing:
+
+| Use case | Command | What you get |
+|---|---|---|
+| **General use** (import the library in your own code) | `pip install -e .` | the library only |
+| **Run the notebooks** under [examples/](examples/) | `pip install -e ".[examples]"` | adds `jupyter`, `matplotlib`, `scikit-learn` |
+| **Develop / run the tests** | `pip install -e ".[dev]"` | adds `pytest`, `scikit-learn` |
+
+Extras combine, e.g. to both hack on the library and run the notebooks:
 
 ```bash
-pip install -e ".[examples]"
+pip install -e ".[dev,examples]"
 ```
 
-To build the documentation site locally, install the `docs` extras and
-serve it:
+### Verify the install
+
+```bash
+python -c "import jax; print(jax.devices())"
+```
+
+This prints the devices JAX will use — `[CpuDevice(id=0)]` on CPU, or
+`[CudaDevice(id=0)]` on a working GPU install.
+
+### GPU setup (NVIDIA / CUDA 12)
+
+The `jax[cuda12]` wheels bundle the CUDA and cuDNN libraries, so you only
+need a recent **NVIDIA driver** — no system-wide CUDA toolkit. Confirm
+the driver is visible first:
+
+```bash
+nvidia-smi
+```
+
+Then install GPU JAX *before* dimma (Step 1 above), install your extras
+(Step 2), and verify:
+
+```bash
+python -c "import jax; print(jax.devices())"   # expect [CudaDevice(id=0)]
+```
+
+If you instead see `[CpuDevice(id=0)]`, JAX isn't finding the GPU —
+almost always a driver/CUDA-version mismatch. Check that `nvidia-smi`
+works and that the driver is new enough for CUDA 12. On a cloud box that
+already ships GPU JAX, you can skip Step 1, but still run this check.
+
+JAX uses the GPU automatically once detected; no notebook or library
+code needs to change.
+
+### Build the documentation locally
 
 ```bash
 pip install -e ".[docs]"
 mkdocs serve   # live preview at http://127.0.0.1:8000
 ```
-
-You can combine extras, e.g. `pip install -e ".[dev,examples]"`.
 
 ## Examples
 
@@ -155,6 +212,12 @@ sample (downloaded automatically on first run, ~30 MB). See the
   sweep over the phase length `q` at fixed `epsilon`.
 - [`privacy_utility_tradeoff.ipynb`](examples/private_spiderboost/notebooks/privacy_utility_tradeoff.ipynb) —
   sweep over privacy budget `epsilon` at fixed `q`.
+- [`varying_delta_experiments.ipynb`](examples/private_spiderboost/notebooks/varying_delta_experiments.ipynb) —
+  sweep over the privacy parameter `delta` at fixed `epsilon`, vs. a
+  non-private SPIDER baseline.
+- [`theorem42_stationarity_rates.ipynb`](examples/private_spiderboost/notebooks/theorem42_stationarity_rates.ipynb) —
+  empirical verification of Theorem 4.2's α-stationarity rate, with
+  `eta`/`q`/`b2` derived per-`epsilon` from Theorem B.3 via `resolve_config`.
 
 ## Project structure
 
@@ -171,6 +234,7 @@ src/dimma/
 │   ├── noise.py       #   - Gaussian noise injection
 │   └── pytree.py      #   - pytree norm / arithmetic helpers
 ├── datasets/          # Cached dataset loaders (Criteo, ...)
+├── models/            # Reference models for testing (MLP, losses)
 └── utils/             # Device / misc utilities
 
 tests/                 # Pytest suite (regression vs. reference impls)
@@ -217,7 +281,8 @@ applicable) in your own environment before installing dimma. See the
 
 ## Development
 
-This project uses a `src/` layout. After cloning, install in editable mode:
+This project uses a `src/` layout. Install the `dev` extras (see
+[Installation](#installation)), then run the suite:
 
 ```bash
 pip install -e ".[dev]"
