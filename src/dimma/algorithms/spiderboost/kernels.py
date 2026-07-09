@@ -20,6 +20,7 @@ without modification, save for import paths.
 
 from __future__ import annotations
 
+import math
 from typing import Any, NamedTuple
 
 import jax
@@ -34,6 +35,7 @@ from dimma.core.pytree import (
 )
 from dimma.core.clipping import per_sample_clip, per_sample_apply_mask
 from dimma.core.noise import add_pytree_gaussian_noise
+from dimma.core.projection import project_l1_ball_pytree
 
 
 class StepOutput(NamedTuple):
@@ -51,7 +53,7 @@ class StepOutput(NamedTuple):
     grad_norm: jax.Array
 
 
-def make_anchor_step(per_sample_grad_fn):
+def make_anchor_step(per_sample_grad_fn, s: int | None = None):
     """Build an anchor-step kernel for a given per-sample gradient function.
 
     Parameters
@@ -59,6 +61,14 @@ def make_anchor_step(per_sample_grad_fn):
     per_sample_grad_fn : callable
         Vmapped per-sample gradient: ``(params, x_batch, y_batch) -> pytree``
         with leaves of shape ``(B, *param_shape)``.
+    s : int or None, optional
+        Gradient sparsity for optional ``l_1``-ball projection post-processing.
+        When ``None`` (default) the returned kernel is the *unmodified*
+        SpiderBoost anchor step — byte-identical XLA program to the pre-Ghazi
+        implementation. When an ``int``, the kernel additionally projects the
+        noisy anchor estimate onto the ``l_1``-ball of radius ``L0 * sqrt(s)``
+        (the Ghazi et al. 2024, Algorithm 1 relaxation of the sparse set). ``s``
+        is a *static* Python int, so ``sqrt(s)`` is a compile-time constant.
 
     Returns
     -------
@@ -84,10 +94,33 @@ def make_anchor_step(per_sample_grad_fn):
         noisy = add_pytree_gaussian_noise(averaged, key, sigma1)
         return StepOutput(grad_estimate=noisy, grad_norm=pytree_global_norm(noisy))
 
-    return anchor_step
+    if s is None:
+        return anchor_step
+
+    def anchor_step_projected(params, x_batch, y_batch, mask, b1, L0, sigma1, key):
+        """Anchor step with ``l_1``-ball projection post-processing.
+
+        Identical to ``anchor_step`` up to the noise injection, then projects
+        the noisy anchor estimate onto ``K = B_1(0, L0 * sqrt(s))`` — the
+        Ghazi et al. (2024), Algorithm 1 convex relaxation of the s-sparse set
+        (a clipped s-sparse gradient has ``||.||_1 <= sqrt(s) * ||.||_2 <=
+        L0 * sqrt(s)``). The projection is deterministic **post-processing** of a
+        DP quantity, so the privacy accounting is UNCHANGED (Ghazi et al. 2024).
+        """
+        per_sample = per_sample_grad_fn(params, x_batch, y_batch)
+        per_sample = per_sample_clip(per_sample, L0)            # Algorithm 2, Section 4.1
+        per_sample = per_sample_apply_mask(per_sample, mask)    # Poisson subsampling
+        summed = pytree_sum_over_batch(per_sample)
+        averaged = pytree_scale(summed, 1.0 / b1)
+        noisy = add_pytree_gaussian_noise(averaged, key, sigma1)
+        radius = L0 * math.sqrt(s)  # static sparsity -> static float; L0 traced
+        noisy = project_l1_ball_pytree(noisy, radius)           # post-processing (Ghazi 2024)
+        return StepOutput(grad_estimate=noisy, grad_norm=pytree_global_norm(noisy))
+
+    return anchor_step_projected
 
 
-def make_variation_step(per_sample_grad_fn):
+def make_variation_step(per_sample_grad_fn, s: int | None = None):
     """Build a variation-step kernel for a given per-sample gradient function.
 
     Parameters
@@ -95,6 +128,18 @@ def make_variation_step(per_sample_grad_fn):
     per_sample_grad_fn : callable
         Vmapped per-sample gradient: ``(params, x_batch, y_batch) -> pytree``
         with leaves of shape ``(B, *param_shape)``.
+    s : int or None, optional
+        Gradient sparsity for optional ``l_1``-ball projection post-processing.
+        When ``None`` (default) the returned kernel is the *unmodified*
+        SpiderBoost variation step — byte-identical XLA program to the pre-Ghazi
+        implementation. When an ``int``, the kernel projects the noisy SPIDER
+        *increment* ``Δ_t`` (not the accumulated estimate) onto the ``l_1``-ball
+        of radius ``L1 * delta_w * sqrt(2 * s)`` before accumulation: a
+        difference of two s-sparse vectors is at most 2s-sparse and, once
+        clipped to ``l_2 <= L1 * delta_w``, has ``l_1 <= sqrt(2s) * L1 *
+        delta_w`` (Ghazi et al. 2024, Algorithm 1 relaxation). ``sqrt(2 * s)``
+        uses the static int ``s``; ``delta_w`` and ``L1`` are traced runtime
+        values (the projection accepts a traced radius).
 
     Returns
     -------
@@ -137,7 +182,45 @@ def make_variation_step(per_sample_grad_fn):
             grad_norm=pytree_global_norm(new_grad_est),
         )
 
-    return variation_step
+    if s is None:
+        return variation_step
+
+    def variation_step_projected(params_t, params_prev, prev_grad_est, x_batch,
+                                 y_batch, mask, b2, L1, sigma2, sigma2_hat, key):
+        """Variation step with ``l_1``-ball projection of the SPIDER increment.
+
+        Identical to ``variation_step`` up to the noisy increment ``Δ_t``, which
+        is then projected onto ``K = B_1(0, L1 * delta_w * sqrt(2 * s))`` BEFORE
+        the accumulation ``∇_t = ∇_{t-1} + Δ_t`` — the sparse object is the
+        *increment*, not the accumulated estimate. The projection is
+        deterministic **post-processing** of a DP quantity, so the privacy
+        accounting is UNCHANGED (Ghazi et al. 2024).
+        """
+        delta_w = pytree_global_norm(pytree_sub(params_t, params_prev))
+
+        per_sample_t = per_sample_grad_fn(params_t, x_batch, y_batch)
+        per_sample_prev = per_sample_grad_fn(params_prev, x_batch, y_batch)
+        per_sample_diff = pytree_sub(per_sample_t, per_sample_prev)
+
+        clip_c = L1 * delta_w
+        per_sample_diff = per_sample_clip(per_sample_diff, clip_c)   # Algorithm 2, Section 4.1
+        per_sample_diff = per_sample_apply_mask(per_sample_diff, mask)
+        summed = pytree_sum_over_batch(per_sample_diff)
+        averaged = pytree_scale(summed, 1.0 / b2)
+
+        noise_std = jnp.minimum(sigma2 * delta_w, sigma2_hat)
+        noisy_delta = add_pytree_gaussian_noise(averaged, key, noise_std)
+
+        radius = L1 * delta_w * math.sqrt(2 * s)  # static 2s; L1, delta_w traced
+        noisy_delta = project_l1_ball_pytree(noisy_delta, radius)   # post-processing (Ghazi 2024)
+
+        new_grad_est = pytree_add(prev_grad_est, noisy_delta)
+        return StepOutput(
+            grad_estimate=new_grad_est,
+            grad_norm=pytree_global_norm(new_grad_est),
+        )
+
+    return variation_step_projected
 
 
 def sgd_update(params, grad_estimate, lr: float):
