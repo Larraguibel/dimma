@@ -13,7 +13,14 @@ from dimma.core.clipping import (
     per_sample_clip,
     per_sample_apply_mask,
 )
-from dimma.core.noise import add_pytree_gaussian_noise
+from dimma.core.noise import (
+    add_pytree_gaussian_noise,
+    add_pytree_laplace_noise,
+)
+from dimma.core.projection import (
+    project_l1_ball,
+    project_l1_ball_pytree,
+)
 
 __all__ = [
     "pytree_global_norm",
@@ -26,4 +33,7 @@ __all__ = [
     "per_sample_clip",
     "per_sample_apply_mask",
     "add_pytree_gaussian_noise",
+    "add_pytree_laplace_noise",
+    "project_l1_ball",
+    "project_l1_ball_pytree",
 ]
