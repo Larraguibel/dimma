@@ -6,7 +6,6 @@ This section documents a research effort to implement and empirically evaluate d
 - [Jax, Flax and Other DP-SGD Libraries](tooling.md)
 - [dimma: the library](library.md)
 - [Algorithms](algorithms/index.md)
-- [Next steps](next-steps.md)
 
 ## Structure of this section
 
@@ -19,4 +18,3 @@ This section documents a research effort to implement and empirically evaluate d
 - **Algorithms** — one page per implemented algorithm, each with theory-vs-implementation gaps, implementation notes, and algorithm-specific properties.
     - *Private Spider-Boost* — first algorithm implemented in dimma. Includes: gap between Theorem 4.2 and the code, heuristics (c=1.0, T+1, sensitivity bound, truncated-Poisson accounting, RNG asymmetry), and the q-invariance of the random output rule.
 - **dimma: the library** — module map, design conventions, how to add a new algorithm.
-- **Next steps** — running TODO list for the project.

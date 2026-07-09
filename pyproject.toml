@@ -29,8 +29,7 @@ examples = [
     "jupyter",
 ]
 docs = [
-    "mkdocs",
-    "mkdocs-material",
+    "mkdocs-material>=9.7.5,<10",
 ]
 
 [tool.hatch.build.targets.wheel]
