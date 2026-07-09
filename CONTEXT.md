@@ -32,6 +32,10 @@ _Avoid_: moment accountant, RDP accounting, Rényi DP
 The process of tracking cumulative privacy loss across training steps. In dimma this is delegated to Google's `dp-accounting` library. Each algorithm injects its own accountant.
 _Avoid_: privacy tracking, epsilon tracking
 
+**Post-processing**
+Any data-independent transformation applied to an already-private quantity. By the DP post-processing guarantee it consumes NO privacy budget: once a value satisfies (ε, δ)-DP, every function of it that does not re-touch the raw data is (ε, δ)-DP for free. This is what makes the ℓ₁-ball projection privacy-free — it acts only on the already-noised estimate.
+_Avoid_: post-hoc processing, output transformation, cleanup step, free step
+
 ---
 
 ## Noise and clipping
@@ -47,6 +51,14 @@ _Avoid_: gradient clipping, norm clipping, clip
 **Clipping threshold (C)**
 The maximum L2 norm allowed for a per-sample gradient. An algorithm may use more than one clipping threshold (e.g. a distinct bound per kind of step); the per-algorithm glossary names them.
 _Avoid_: clip norm, max gradient norm
+
+**Gradient sparsity (s)**
+An upper bound on the number of nonzero coordinates in a per-sample gradient. A required hyperparameter, supplied by the caller and NEVER estimated from data — adapting to an unknown `s` is an open problem, so dimma treats it as a fixed design input, the same way it treats the clipping thresholds. It enters a projection radius through `√s` (a clipped s-sparse vector satisfies `‖·‖₁ ≤ √s · ‖·‖₂`).
+_Avoid_: sparsity level, nnz, support size, number of nonzeros
+
+**ℓ₁-ball projection**
+Euclidean projection of a noisy gradient estimate onto an ℓ₁-ball — a convex relaxation of the sparse set (every s-sparse, L2-bounded vector lies inside an ℓ₁-ball whose radius scales with `√s`). Applied after calibrated noise as [post-processing](#privacy-guarantees), it converts gradient sparsity into near-dimension-independent error by discarding noise energy in the many directions no sparse signal can occupy. The projected estimate is BIASED.
+_Avoid_: l1 projection, sparse projection, l1 clipping, simplex projection
 
 ---
 
