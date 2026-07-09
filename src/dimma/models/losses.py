@@ -13,6 +13,7 @@ import jax
 import jax.numpy as jnp
 
 from dimma.models.mlp import forward
+from dimma.models.hashed_logreg import forward as hashed_forward
 
 
 def per_sample_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
@@ -33,6 +34,35 @@ def per_sample_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
         Binary label in {0., 1.}.
     """
     logit = forward(params, x)
+    return jnp.maximum(logit, 0.0) - logit * y + jnp.log1p(jnp.exp(-jnp.abs(logit)))
+
+
+def per_sample_hashed_bce_loss(
+    params: dict, x: jax.Array, y: jax.Array
+) -> jax.Array:
+    """Sigmoid BCE loss for a **single** example, hashed-logreg model.
+
+    Identical numerically-stable BCE formula as :func:`per_sample_bce_loss`,
+    but evaluates the logit with :func:`dimma.models.hashed_logreg.forward`.
+    The logit map is linear in the (sparse) feature vector, so the per-sample
+    gradient is sparse — see ``dimma.models.hashed_logreg`` for why.
+
+    Signature is ``(params, x_single, y_single) -> scalar``, matching the
+    contract expected by ``dimma.train`` for per-sample gradient computation::
+
+        jax.vmap(jax.grad(per_sample_hashed_bce_loss), in_axes=(None, 0, 0))
+
+    Parameters
+    ----------
+    params : dict
+        Hashed-logreg param pytree.
+    x : jax.Array, shape (num_dense + num_fields,)
+        Single feature vector: dense features followed by float-encoded global
+        bucket indices (see :func:`dimma.models.hashed_logreg.hash_buckets`).
+    y : jax.Array, shape ()
+        Binary label in {0., 1.}.
+    """
+    logit = hashed_forward(params, x)
     return jnp.maximum(logit, 0.0) - logit * y + jnp.log1p(jnp.exp(-jnp.abs(logit)))
 
 
