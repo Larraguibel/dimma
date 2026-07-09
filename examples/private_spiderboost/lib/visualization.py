@@ -394,6 +394,182 @@ def plot_grad_norm_comparison(
     return fig
 
 
+def plot_error_vs_dimension(
+    dimensions: Sequence[int],
+    projected_mean: Sequence[float],
+    projected_std: Sequence[float],
+    unprojected_mean: Sequence[float],
+    unprojected_std: Sequence[float],
+    save_path: str | Path,
+) -> plt.Figure:
+    """Plot ``l_2`` estimation error vs. dimension ``d`` on log-log axes.
+
+    This is the **dimension-independence** figure for the projection mechanism
+    (Ghazi et al. 2024, Algorithm 1). Two series are drawn against the ambient
+    dimension ``d``, each with a mean ± std band across trials:
+
+    - **projected** — error of the perturb-then-project estimate ``ẑ``. Nearly
+      flat in ``d`` (grows only poly-logarithmically), because Lemma 3.1 bounds
+      it by ``‖ξ‖_∞``, not ``‖ξ‖_2``.
+    - **unprojected** — error of the noisy mean ``z̃`` with no projection. Grows
+      like ``√d`` (the full noise magnitude), a straight line of slope ``1/2``
+      on log-log axes.
+
+    Parameters
+    ----------
+    dimensions : Sequence[int]
+        The ambient dimensions ``d`` that were swept (x-axis).
+    projected_mean, projected_std : Sequence[float]
+        Mean and standard deviation (across trials) of ``‖ẑ − z̄‖_2`` per ``d``.
+    unprojected_mean, unprojected_std : Sequence[float]
+        Mean and standard deviation of ``‖z̃ − z̄‖_2`` per ``d``.
+    save_path : str or pathlib.Path
+        Output PNG location.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+
+    Notes
+    -----
+    The ± std bands are clipped at a small positive floor before plotting so the
+    log-scaled ``fill_between`` does not receive non-positive values.
+    """
+    save_path = _ensure_parent(save_path)
+    d = np.asarray(dimensions, dtype=float)
+    pm = np.asarray(projected_mean, dtype=float)
+    ps = np.asarray(projected_std, dtype=float)
+    um = np.asarray(unprojected_mean, dtype=float)
+    us = np.asarray(unprojected_std, dtype=float)
+    floor = 1e-12
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(d, um, marker="s", lw=1.6, color="tab:red",
+            label="unprojected (noisy mean)")
+    ax.fill_between(d, np.maximum(um - us, floor), um + us,
+                    color="tab:red", alpha=0.2)
+    ax.plot(d, pm, marker="o", lw=1.6, color="tab:blue",
+            label="projected (mechanism)")
+    ax.fill_between(d, np.maximum(pm - ps, floor), pm + ps,
+                    color="tab:blue", alpha=0.2)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"Dimension $d$ (log scale)")
+    ax.set_ylabel(r"$\|\hat z - \bar z\|_2$ (log scale)")
+    ax.set_title("Estimation error vs. dimension (dimension-independence)")
+    ax.legend(loc="upper left")
+    ax.grid(True, alpha=0.3, which="both")
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    return fig
+
+
+def plot_lemma31_bound(
+    bound: Sequence[float],
+    error: Sequence[float],
+    save_path: str | Path,
+    labels: Sequence[str] | None = None,
+) -> plt.Figure:
+    """Scatter realized ``l_2`` error against the Lemma 3.1 bound with a ``y=x`` line.
+
+    Lemma 3.1 (Ghazi et al. 2024) gives the *deterministic* per-trial guarantee
+    ``‖ẑ − z̄‖_2 <= √(2 L ‖ξ‖_∞ √s)``. This plots the realized error (y) against
+    that bound (x); every point must sit **on or below** the ``y = x`` reference
+    line for the lemma to hold.
+
+    Parameters
+    ----------
+    bound : Sequence[float]
+        The Lemma 3.1 bound ``√(2 L ‖ξ‖_∞ √s)`` per trial (x-axis).
+    error : Sequence[float]
+        The realized error ``‖ẑ − z̄‖_2`` per trial (y-axis).
+    save_path : str or pathlib.Path
+        Output PNG location.
+    labels : Sequence[str] or None, default None
+        Optional per-point group label (e.g. ``"Laplace"`` / ``"Gaussian"``).
+        When given, points are colored and legended by group. When ``None`` all
+        points share a single color.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+    save_path = _ensure_parent(save_path)
+    x = np.asarray(bound, dtype=float)
+    y = np.asarray(error, dtype=float)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    if labels is None:
+        ax.scatter(x, y, s=18, alpha=0.6, color="tab:blue")
+    else:
+        labels = np.asarray(labels)
+        palette = ["tab:blue", "tab:orange", "tab:green", "tab:purple"]
+        for i, g in enumerate(dict.fromkeys(labels.tolist())):
+            m = labels == g
+            ax.scatter(x[m], y[m], s=18, alpha=0.6,
+                       color=palette[i % len(palette)], label=str(g))
+        ax.legend(loc="upper left")
+    hi = float(max(x.max(), y.max())) * 1.05 if x.size else 1.0
+    ax.plot([0, hi], [0, hi], color="gray", lw=1.0, ls="--", label="_y=x")
+    ax.text(0.98, 0.02, r"$y = x$ (Lemma 3.1)", transform=ax.transAxes,
+            ha="right", va="bottom", color="gray")
+    ax.set_xlim(0, hi)
+    ax.set_ylim(0, hi)
+    ax.set_aspect("equal")
+    ax.set_xlabel(r"Lemma 3.1 bound  $\sqrt{2 L \|\xi\|_\infty \sqrt{s}}$")
+    ax.set_ylabel(r"Realized error  $\|\hat z - \bar z\|_2$")
+    ax.set_title("Lemma 3.1: realized error vs. bound")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    return fig
+
+
+def plot_grad_sparsity_histogram(
+    nnz_per_sample: Sequence[int],
+    s: int,
+    save_path: str | Path,
+) -> plt.Figure:
+    """Histogram of per-sample gradient nonzero counts, with a line at ``s``.
+
+    Empirically confirms that the hashed-logreg per-sample gradient is sparse:
+    each sample's global gradient has at most ``num_fields + num_dense + 1``
+    nonzeros regardless of the (large) table size. A vertical line marks the
+    sparsity bound ``s`` used as the projection radius input.
+
+    Parameters
+    ----------
+    nnz_per_sample : Sequence[int]
+        Number of nonzero entries in each per-sample flattened gradient.
+    s : int
+        The sparsity bound ``s`` (drawn as a vertical reference line).
+    save_path : str or pathlib.Path
+        Output PNG location.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    """
+    save_path = _ensure_parent(save_path)
+    nnz = np.asarray(nnz_per_sample, dtype=int)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    lo = int(nnz.min())
+    hi = int(max(nnz.max(), s))
+    bins = np.arange(lo - 0.5, hi + 1.5, 1.0)
+    ax.hist(nnz, bins=bins, color="tab:blue", alpha=0.75,
+            edgecolor="white", label="per-sample nonzeros")
+    ax.axvline(s, color="tab:red", lw=1.6, ls="--",
+               label=f"sparsity bound s = {s}")
+    ax.set_xlabel("Nonzeros in per-sample gradient")
+    ax.set_ylabel("Count")
+    ax.set_title("Per-sample gradient sparsity")
+    ax.legend(loc="upper left")
+    ax.grid(True, alpha=0.3, axis="y")
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    return fig
+
+
 def plot_hyperparameter_summary(config: dict,
                                 save_path: str | Path) -> plt.Figure:
     """Render a run's hyperparameters as a one-page table figure.
