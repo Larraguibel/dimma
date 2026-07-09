@@ -14,6 +14,10 @@ from dimma.accounting.sampling import (
     poisson_gaussian_epsilon,
     poisson_gaussian_truncated_epsilon,
 )
+from dimma.accounting.projection import (
+    laplace_noise_scale,
+    gaussian_noise_scale,
+)
 
 __all__ = [
     "DEFAULT_C",
@@ -22,4 +26,6 @@ __all__ = [
     "verify_epsilon",
     "poisson_gaussian_epsilon",
     "poisson_gaussian_truncated_epsilon",
+    "laplace_noise_scale",
+    "gaussian_noise_scale",
 ]
