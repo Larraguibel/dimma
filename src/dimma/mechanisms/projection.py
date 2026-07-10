@@ -73,8 +73,9 @@ def projection_mechanism(
     epsilon : float
         Target privacy budget ``ε``. Must be ``> 0``.
     delta : float
-        Target failure probability ``δ``. Must be ``>= 0``. ``0.0`` selects the
-        pure-DP Laplace branch; any positive value selects the Gaussian branch.
+        Target failure probability ``δ``. Must be in ``[0, 1)`` (``δ >= 1`` is
+        meaningless for DP). ``0.0`` selects the pure-DP Laplace branch; any
+        value in ``(0, 1)`` selects the Gaussian branch.
     n : float
         Dataset size the mean was averaged over. Must be ``>= 1``.
     L : float
@@ -102,12 +103,13 @@ def projection_mechanism(
     Raises
     ------
     ValueError
-        If ``epsilon <= 0``, ``delta < 0``, ``n < 1``, ``s < 1`` or ``L <= 0``.
+        If ``epsilon <= 0``, ``delta`` is outside ``[0, 1)``, ``n < 1``,
+        ``s < 1`` or ``L <= 0``.
     """
     if epsilon <= 0.0:
         raise ValueError(f"epsilon must be > 0, got {epsilon}.")
-    if delta < 0.0:
-        raise ValueError(f"delta must be >= 0, got {delta}.")
+    if delta < 0.0 or delta >= 1.0:
+        raise ValueError(f"delta must be in [0, 1), got {delta}.")
     if n < 1:
         raise ValueError(f"n must be >= 1, got {n}.")
     if s < 1:

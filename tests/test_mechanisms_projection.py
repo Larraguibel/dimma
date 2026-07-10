@@ -217,6 +217,12 @@ def test_dimension_independence_smoke():
         dict(epsilon=0.0, delta=1e-5, n=100, L=1.0, s=5.0),
         dict(epsilon=-1.0, delta=1e-5, n=100, L=1.0, s=5.0),
         dict(epsilon=1.0, delta=-1e-5, n=100, L=1.0, s=5.0),
+        # delta >= 1 is meaningless for DP (issue #21): 1.0 gives a valid-looking
+        # but meaningless release, 1.25 zeroes the Gaussian scale (no noise), and
+        # 2.0 drives sqrt of a negative in the Gaussian calibration.
+        dict(epsilon=1.0, delta=1.0, n=100, L=1.0, s=5.0),
+        dict(epsilon=1.0, delta=1.25, n=100, L=1.0, s=5.0),
+        dict(epsilon=1.0, delta=2.0, n=100, L=1.0, s=5.0),
         dict(epsilon=1.0, delta=1e-5, n=0, L=1.0, s=5.0),
         dict(epsilon=1.0, delta=1e-5, n=100, L=1.0, s=0.5),
         dict(epsilon=1.0, delta=1e-5, n=100, L=0.0, s=5.0),
