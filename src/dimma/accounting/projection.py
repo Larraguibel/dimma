@@ -30,7 +30,7 @@ def laplace_noise_scale(L: float, s: float, n: float, epsilon: float) -> float:
 
     .. math::
 
-        \\sigma = \\frac{2 L \\sqrt{s}}{n \\, \\epsilon}
+        b = \\frac{2 L \\sqrt{s}}{n \\, \\epsilon}
 
     This is the ``l_1``-sensitivity ``Δ₁ = 2 L √s / n`` of the empirical mean
     over sparse neighbouring datasets, divided by ``ε`` — the standard Laplace

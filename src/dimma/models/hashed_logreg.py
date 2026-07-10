@@ -48,6 +48,11 @@ import jax.numpy as jnp
 import numpy as np
 
 
+# Standard deviation of the Gaussian used to initialise the weight table and
+# dense weights (small so the initial logits stay near zero).
+_INIT_STD = 0.01
+
+
 # ---------------------------------------------------------------------------
 # Preprocessing helper (dataset-agnostic, NumPy)
 # ---------------------------------------------------------------------------
@@ -144,8 +149,8 @@ def init_params(
         Number of buckets per categorical field.
     """
     k_table, k_dense = jax.random.split(key)
-    table = jax.random.normal(k_table, (num_fields * num_buckets,)) * 0.01
-    w_dense = jax.random.normal(k_dense, (num_dense,)) * 0.01
+    table = jax.random.normal(k_table, (num_fields * num_buckets,)) * _INIT_STD
+    w_dense = jax.random.normal(k_dense, (num_dense,)) * _INIT_STD
     b = jnp.array(0.0)
     return {"table": table, "w_dense": w_dense, "b": b}
 

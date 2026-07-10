@@ -19,12 +19,14 @@ Projections onto the l1-Ball for Learning in High Dimensions", ICML 2008.
 
 from __future__ import annotations
 
+from typing import Any
+
 import jax
 import jax.numpy as jnp
 from jax.flatten_util import ravel_pytree
 
 
-def project_l1_ball(x: jax.Array, radius) -> jax.Array:
+def project_l1_ball(x: jax.Array, radius: float | jax.Array) -> jax.Array:
     """Euclidean projection of ``x`` onto the ``l_1`` ball of a given radius.
 
     Solves ``argmin_z ‖z − x‖_2`` subject to ``‖z‖_1 <= radius`` via the
@@ -48,19 +50,27 @@ def project_l1_ball(x: jax.Array, radius) -> jax.Array:
     projected : jax.Array
         Same shape and dtype as ``x``; satisfies ``‖projected‖_1 <= radius``.
     """
+    # A negative radius describes an empty l_1 ball and would silently project
+    # to the origin. Guard it eagerly, but ONLY when radius is concrete: this
+    # function is jit-traced with a *traced* radius in the SpiderBoost kernels,
+    # where a Python comparison would break tracing. Skipping the check under a
+    # tracer adds no ops to the jaxpr, so the traced program is unchanged.
+    if not isinstance(radius, jax.core.Tracer):
+        assert radius >= 0, f"radius must be non-negative, got {radius}."
+
     abs_x = jnp.abs(x)
     d = x.shape[0]
 
     # Sort |x| in descending order and form the running cumulative sum.
     u = jnp.sort(abs_x)[::-1]
-    css = jnp.cumsum(u)
+    cssv = jnp.cumsum(u)
 
-    # rho = number of coordinates k (1-indexed) with u_k * k > css_k − radius.
-    k = jnp.arange(1, d + 1, dtype=css.dtype)
-    rho = jnp.sum(u * k > (css - radius))
+    # rho = number of coordinates k (1-indexed) with u_k * k > cssv_k − radius.
+    k = jnp.arange(1, d + 1, dtype=cssv.dtype)
+    rho = jnp.sum(u * k > (cssv - radius))
     rho = jnp.maximum(rho, 1)  # guard the all-zero case (avoids rho = 0)
 
-    theta = jnp.maximum((css[rho - 1] - radius) / rho.astype(css.dtype), 0.0)
+    theta = jnp.maximum((cssv[rho - 1] - radius) / rho, 0.0)
     projected = jnp.sign(x) * jnp.maximum(abs_x - theta, 0.0)
 
     # Inputs already inside the ball are returned bit-exactly unchanged.
@@ -68,7 +78,7 @@ def project_l1_ball(x: jax.Array, radius) -> jax.Array:
     return jnp.where(l1norm <= radius, x, projected)
 
 
-def project_l1_ball_pytree(pytree, radius):
+def project_l1_ball_pytree(pytree: Any, radius: float | jax.Array) -> Any:
     """Project a whole pytree onto a single global ``l_1`` ball.
 
     All leaves are flattened into one vector (via ``ravel_pytree``), projected

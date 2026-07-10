@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from typing import Any, NamedTuple
 
+import jax
+
 from dimma.accounting.projection import (
     gaussian_noise_scale,
     laplace_noise_scale,
@@ -63,7 +65,7 @@ def projection_mechanism(
     n: float,
     L: float,
     s: float,
-    key,
+    key: jax.Array,
 ) -> ProjectionOutput:
     """Privatise an empirical mean via perturb-then-project (Algorithm 1).
 
