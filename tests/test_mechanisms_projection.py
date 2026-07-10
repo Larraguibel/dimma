@@ -57,7 +57,7 @@ def test_laplace_branch_bit_exact_reconstruction():
 
     zhat = projection_mechanism(
         mean, epsilon=eps, delta=0.0, n=n, L=L, s=s, key=key
-    )
+    ).zhat
 
     scale = laplace_noise_scale(L, s, n, eps)
     z_tilde_manual = add_pytree_laplace_noise(mean, key, scale)
@@ -76,7 +76,7 @@ def test_gaussian_branch_bit_exact_reconstruction():
 
     zhat = projection_mechanism(
         mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key
-    )
+    ).zhat
 
     std = gaussian_noise_scale(L, n, eps, delta)
     z_tilde_manual = add_pytree_gaussian_noise(mean, key, std)
@@ -85,21 +85,21 @@ def test_gaussian_branch_bit_exact_reconstruction():
     assert jnp.array_equal(zhat, zhat_manual)
 
 
-def test_return_noisy_convention():
+def test_projection_output_namedtuple():
     L, s, n, eps, delta = 1.0, 5.0, 1000.0, 0.5, 1e-5
     rng = np.random.default_rng(2)
     mean = _sparse_mean(rng, 128, int(s), L)
     key = jax.random.PRNGKey(7)
 
-    zhat_only = projection_mechanism(
+    out = projection_mechanism(
         mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key
     )
-    zhat, z_tilde = projection_mechanism(
-        mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key,
-        return_noisy=True,
-    )
-    # return_noisy must not perturb the projected output.
-    assert jnp.array_equal(zhat, zhat_only)
+    # The mechanism always returns a ProjectionOutput(zhat, z_tilde) named tuple.
+    assert out._fields == ("zhat", "z_tilde")
+    # Field access and positional unpacking agree.
+    zhat, z_tilde = out
+    assert jnp.array_equal(zhat, out.zhat)
+    assert jnp.array_equal(z_tilde, out.z_tilde)
     # z_tilde is the pre-projection noisy vector: same shape as the mean, and
     # projecting it reproduces zhat.
     assert z_tilde.shape == mean.shape
@@ -116,7 +116,7 @@ def test_pytree_mean_single_code_path():
 
     zhat = projection_mechanism(
         pytree, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key
-    )
+    ).zhat
     flat = jnp.concatenate([zhat["w"], zhat["b"]])
     assert _l1(flat) <= L * math.sqrt(s) + 1e-4
     assert set(zhat.keys()) == {"w", "b"}
@@ -137,7 +137,7 @@ def test_output_feasible_in_l1_ball(delta):
         key = jax.random.PRNGKey(t)
         zhat = projection_mechanism(
             mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key
-        )
+        ).zhat
         assert _l1(zhat) <= radius + 1e-4
 
 
@@ -156,8 +156,7 @@ def test_lemma_31_bound_per_trial(delta):
         mean = _sparse_mean(rng, d, int(s), L)
         key = jax.random.PRNGKey(1000 + t)
         zhat, z_tilde = projection_mechanism(
-            mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key,
-            return_noisy=True,
+            mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key
         )
         xi = z_tilde - mean
         xi_inf = float(jnp.max(jnp.abs(xi)))
@@ -187,8 +186,7 @@ def test_dimension_independence_smoke():
             mean = _sparse_mean(rng, d, int(s), L)
             key = jax.random.PRNGKey(t)
             zhat, z_tilde = projection_mechanism(
-                mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key,
-                return_noisy=True,
+                mean, epsilon=eps, delta=delta, n=n, L=L, s=s, key=key
             )
             pe.append(_l2(zhat - mean))
             ue.append(_l2(z_tilde - mean))

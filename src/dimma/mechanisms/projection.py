@@ -23,6 +23,7 @@ Optimization with Sparse Gradients"*, NeurIPS 2024, Section 3.
 from __future__ import annotations
 
 import math
+from typing import Any, NamedTuple
 
 from dimma.accounting.projection import (
     gaussian_noise_scale,
@@ -35,6 +36,25 @@ from dimma.core.noise import (
 from dimma.core.projection import project_l1_ball_pytree
 
 
+class ProjectionOutput(NamedTuple):
+    """Return value of :func:`projection_mechanism`.
+
+    Attributes
+    ----------
+    zhat : pytree
+        The private, feasible estimate ``ẑ`` (satisfies ``‖ẑ‖_1 <= L√s``);
+        this is the released quantity. Same structure as the input ``mean``.
+    z_tilde : pytree
+        The pre-projection noisy vector ``z̃`` (same structure as ``mean``),
+        from which the noise ``ξ = z̃ − mean`` can be recovered (needed by the
+        Lemma 3.1 tests and the demo notebook) without re-deriving the RNG
+        internals.
+    """
+
+    zhat: Any
+    z_tilde: Any
+
+
 def projection_mechanism(
     mean,
     *,
@@ -44,8 +64,7 @@ def projection_mechanism(
     L: float,
     s: float,
     key,
-    return_noisy: bool = False,
-):
+) -> ProjectionOutput:
     """Privatise an empirical mean via perturb-then-project (Algorithm 1).
 
     Adds calibrated coordinate-wise noise to ``mean`` and projects the result
@@ -104,20 +123,14 @@ def projection_mechanism(
         ``L√s`` and, in the Laplace branch, the noise scale. Must be ``>= 1``.
     key : jax.Array
         PRNG key for the noise draw.
-    return_noisy : bool, default ``False``
-        If ``True``, also return the pre-projection noisy vector ``z̃`` so the
-        caller can recover the noise ``ξ = z̃ − mean`` (needed by the Lemma 3.1
-        tests and the demo notebook) without re-deriving the RNG internals.
 
     Returns
     -------
-    zhat : same structure as ``mean``
-        The private, feasible estimate ``ẑ`` (satisfies ``‖ẑ‖_1 <= L√s``).
-        Returned alone when ``return_noisy`` is ``False``.
-    (zhat, z_tilde) : tuple
-        When ``return_noisy`` is ``True``, the pair of the projected estimate
-        ``ẑ`` and the pre-projection noisy vector ``z̃`` (same structure as
-        ``mean``).
+    ProjectionOutput
+        A ``(zhat, z_tilde)`` named tuple: the private, feasible estimate ``ẑ``
+        (satisfies ``‖ẑ‖_1 <= L√s``) and the pre-projection noisy vector ``z̃``
+        (both the same structure as ``mean``). The noise is recoverable as
+        ``ξ = z_tilde − mean``.
 
     Raises
     ------
@@ -152,6 +165,4 @@ def projection_mechanism(
     radius = L * math.sqrt(s)
     zhat = project_l1_ball_pytree(z_tilde, radius)
 
-    if return_noisy:
-        return zhat, z_tilde
-    return zhat
+    return ProjectionOutput(zhat, z_tilde)
