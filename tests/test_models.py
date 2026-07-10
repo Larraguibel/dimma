@@ -157,6 +157,28 @@ def test_hash_buckets_float32_exact_roundtrip():
     assert np.all(out == exact.astype(np.float32))
 
 
+def test_hash_buckets_rejects_oversized_table():
+    # num_fields * num_buckets must stay <= 2**24 for the float32 pack to be
+    # exact. With num_buckets = 2**20 and 26 fields the max index blows past
+    # 2**24, so hash_buckets must refuse rather than alias buckets silently.
+    import pytest
+
+    rng = np.random.default_rng(9)
+    ids = rng.integers(0, 10_000_000, size=(4, _HL_FIELDS))
+    with pytest.raises(ValueError, match="2\\*\\*24"):
+        hash_buckets(ids, 2**20)
+
+
+def test_hash_buckets_notebook_defaults_pass_guard():
+    # Notebook defaults (num_fields=26, num_buckets=1024, max index 26623)
+    # are comfortably under 2**24 and must not trip the guard.
+    rng = np.random.default_rng(10)
+    ids = rng.integers(0, 10_000_000, size=(8, _HL_FIELDS))
+    out = hash_buckets(ids, _HL_BUCKETS)
+    assert out.shape == ids.shape
+    assert np.all(out < _HL_FIELDS * _HL_BUCKETS)
+
+
 def _make_hashed_batch(B=8, seed=0):
     rng = np.random.default_rng(seed)
     dense = rng.standard_normal((B, _HL_DENSE)).astype(np.float32)
