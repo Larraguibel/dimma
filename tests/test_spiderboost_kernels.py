@@ -238,6 +238,37 @@ def test_factories_accept_valid_s(good_s):
     assert callable(make_variation_step(grad_fn, s=good_s))
 
 
+def test_anchor_projection_hand_reconstruction():
+    from dimma.core.pytree import (
+        pytree_scale,
+        pytree_sum_over_batch,
+    )
+    from dimma.core.clipping import per_sample_clip, per_sample_apply_mask
+    from dimma.core.noise import add_pytree_gaussian_noise
+
+    grad_fn = _make_grad_fn()
+    s = 2
+    anchor = make_anchor_step(grad_fn, s=s)
+    B = 4
+    w = jnp.array([0.5, -0.3])
+    x = jax.random.normal(jax.random.PRNGKey(1), (B, 2))
+    y = jax.random.normal(jax.random.PRNGKey(2), (B,))
+    mask = jnp.ones(B)
+    L0, sigma1 = 1.0, 5.0
+    key = jax.random.PRNGKey(11)
+
+    out = anchor(w, x, y, mask, b1=B, L0=L0, sigma1=sigma1, key=key)
+
+    # Hand-reconstruct: project(noisy anchor estimate), same key, bit-exact.
+    per_sample = per_sample_clip(grad_fn(w, x, y), L0)
+    per_sample = per_sample_apply_mask(per_sample, mask)
+    averaged = pytree_scale(pytree_sum_over_batch(per_sample), 1.0 / B)
+    noisy = add_pytree_gaussian_noise(averaged, key, sigma1)
+    expected = project_l1_ball_pytree(noisy, L0 * math.sqrt(s))
+
+    _assert_tree_equal(out.grad_estimate, expected)
+
+
 def test_variation_projection_nonzero_prev_hand_reconstruction():
     from dimma.core.pytree import (
         pytree_add,
