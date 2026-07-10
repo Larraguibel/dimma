@@ -67,7 +67,8 @@ def test_laplace_branch_bit_exact_reconstruction():
 
 
 def test_gaussian_branch_bit_exact_reconstruction():
-    L, s, n, eps, delta = 1.0, 5.0, 1000.0, 1.0, 1e-5
+    # eps < 1 is required in the Gaussian branch (issue #20).
+    L, s, n, eps, delta = 1.0, 5.0, 1000.0, 0.5, 1e-5
     d = 200
     rng = np.random.default_rng(1)
     mean = _sparse_mean(rng, d, int(s), L)
@@ -85,7 +86,7 @@ def test_gaussian_branch_bit_exact_reconstruction():
 
 
 def test_return_noisy_convention():
-    L, s, n, eps, delta = 1.0, 5.0, 1000.0, 1.0, 1e-5
+    L, s, n, eps, delta = 1.0, 5.0, 1000.0, 0.5, 1e-5
     rng = np.random.default_rng(2)
     mean = _sparse_mean(rng, 128, int(s), L)
     key = jax.random.PRNGKey(7)
@@ -109,7 +110,7 @@ def test_return_noisy_convention():
 
 def test_pytree_mean_single_code_path():
     """A nested pytree mean is projected globally, same as its flat raveling."""
-    L, s, n, eps, delta = 1.0, 6.0, 1000.0, 1.0, 1e-5
+    L, s, n, eps, delta = 1.0, 6.0, 1000.0, 0.5, 1e-5
     key = jax.random.PRNGKey(99)
     pytree = {"w": jnp.array([0.1, 0.0, -0.2, 0.0]), "b": jnp.array([0.05, 0.0])}
 
@@ -126,7 +127,8 @@ def test_pytree_mean_single_code_path():
 
 @pytest.mark.parametrize("delta", [0.0, 1e-5])
 def test_output_feasible_in_l1_ball(delta):
-    L, s, n, eps = 1.0, 5.0, 200.0, 1.0
+    # eps < 1 so the parametrized Gaussian branch (delta > 0) is accepted.
+    L, s, n, eps = 1.0, 5.0, 200.0, 0.5
     d = 500
     rng = np.random.default_rng(3)
     radius = L * math.sqrt(s)
@@ -146,7 +148,8 @@ def test_output_feasible_in_l1_ball(delta):
 def test_lemma_31_bound_per_trial(delta):
     # ‖ẑ − z̄‖_2 <= sqrt(2 L ‖ξ‖_∞ sqrt(s)) almost surely (both branches),
     # provided z̄ ∈ K (guaranteed: mean is s-sparse with l_2 < L).
-    L, s, n, eps = 1.0, 5.0, 100.0, 1.0
+    # eps < 1 so the parametrized Gaussian branch (delta > 0) is accepted.
+    L, s, n, eps = 1.0, 5.0, 100.0, 0.5
     d = 300
     rng = np.random.default_rng(4)
     for t in range(100):
@@ -171,7 +174,7 @@ def test_dimension_independence_smoke():
     # Projected l_2 error stays ~flat as d grows, while the unprojected noise
     # l_2 error grows ~sqrt(d). Fixed (L, s, n, eps, delta) -> fixed noise
     # scale, so only d changes the picture.
-    L, s, n, eps, delta = 1.0, 5.0, 1000.0, 1.0, 1e-5
+    L, s, n, eps, delta = 1.0, 5.0, 1000.0, 0.5, 1e-5
     dims = [100, 10000]
     n_trials = 30
 
@@ -216,17 +219,25 @@ def test_dimension_independence_smoke():
     [
         dict(epsilon=0.0, delta=1e-5, n=100, L=1.0, s=5.0),
         dict(epsilon=-1.0, delta=1e-5, n=100, L=1.0, s=5.0),
-        dict(epsilon=1.0, delta=-1e-5, n=100, L=1.0, s=5.0),
+        dict(epsilon=0.5, delta=-1e-5, n=100, L=1.0, s=5.0),
         # delta >= 1 is meaningless for DP (issue #21): 1.0 gives a valid-looking
         # but meaningless release, 1.25 zeroes the Gaussian scale (no noise), and
-        # 2.0 drives sqrt of a negative in the Gaussian calibration.
-        dict(epsilon=1.0, delta=1.0, n=100, L=1.0, s=5.0),
-        dict(epsilon=1.0, delta=1.25, n=100, L=1.0, s=5.0),
-        dict(epsilon=1.0, delta=2.0, n=100, L=1.0, s=5.0),
-        dict(epsilon=1.0, delta=1e-5, n=0, L=1.0, s=5.0),
-        dict(epsilon=1.0, delta=1e-5, n=100, L=1.0, s=0.5),
-        dict(epsilon=1.0, delta=1e-5, n=100, L=0.0, s=5.0),
-        dict(epsilon=1.0, delta=1e-5, n=100, L=-1.0, s=5.0),
+        # 2.0 drives sqrt of a negative in the Gaussian calibration. The delta
+        # guard fires before the Gaussian eps guard, so epsilon here is a don't-care.
+        dict(epsilon=0.5, delta=1.0, n=100, L=1.0, s=5.0),
+        dict(epsilon=0.5, delta=1.25, n=100, L=1.0, s=5.0),
+        dict(epsilon=0.5, delta=2.0, n=100, L=1.0, s=5.0),
+        # eps >= 1 in the Gaussian branch (delta > 0) is a silent privacy
+        # violation under the classical Dwork-Roth calibration (issue #20): the
+        # classical bound is only valid for eps in (0, 1), so reject eps = 1 and
+        # eps = 4 rather than under-noise.
+        dict(epsilon=1.0, delta=1e-5, n=100, L=1.0, s=5.0),
+        dict(epsilon=4.0, delta=1e-5, n=100, L=1.0, s=5.0),
+        # n / s / L guards (eps < 1 so the Gaussian eps guard does not mask them).
+        dict(epsilon=0.5, delta=1e-5, n=0, L=1.0, s=5.0),
+        dict(epsilon=0.5, delta=1e-5, n=100, L=1.0, s=0.5),
+        dict(epsilon=0.5, delta=1e-5, n=100, L=0.0, s=5.0),
+        dict(epsilon=0.5, delta=1e-5, n=100, L=-1.0, s=5.0),
     ],
 )
 def test_validation_raises(kwargs):
@@ -241,6 +252,18 @@ def test_valid_inputs_do_not_raise():
     key = jax.random.PRNGKey(0)
     # delta = 0 is valid (pure-DP branch); s = 1, n = 1 are the boundaries.
     projection_mechanism(mean, epsilon=1.0, delta=0.0, n=1, L=1.0, s=1.0, key=key)
+    # A small valid Gaussian eps (< 1) is accepted.
     projection_mechanism(
-        mean, epsilon=1.0, delta=1e-5, n=1, L=1.0, s=1.0, key=key
+        mean, epsilon=0.5, delta=1e-5, n=1, L=1.0, s=1.0, key=key
+    )
+
+
+@pytest.mark.parametrize("eps", [1.0, 4.0, 100.0])
+def test_laplace_branch_accepts_epsilon_ge_1(eps):
+    # The pure-DP Laplace branch (delta = 0) is valid for every eps > 0; the
+    # eps < 1 restriction applies ONLY to the Gaussian branch (issue #20).
+    mean = jnp.zeros(10)
+    key = jax.random.PRNGKey(0)
+    projection_mechanism(
+        mean, epsilon=eps, delta=0.0, n=100, L=1.0, s=5.0, key=key
     )

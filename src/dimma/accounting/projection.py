@@ -78,6 +78,20 @@ def gaussian_noise_scale(
 
     .. note::
 
+        **Valid only for ``ε ∈ (0, 1)``.** The classical Dwork–Roth calibration
+        ``σ = √(2 ln(1.25/δ)) · Δ₂ / ε`` (equivalently the ``√(8 ln(1.25/δ))``
+        form above with ``Δ₂ = 2 L / n``) certifies ``(ε, δ)``-DP only for
+        ``ε ∈ (0, 1)``; for ``ε ≥ 1`` the returned ``σ`` under-noises and the
+        release is **not** ``(ε, δ)``-DP. This function is a pure closed-form
+        scale and does **not** validate ``ε`` (mirroring
+        :func:`laplace_noise_scale`); the eager ``ε < 1`` guard lives in
+        :func:`dimma.mechanisms.projection.projection_mechanism`, which is the
+        layer that claims DP. If all-``ε`` support is ever needed, switch to the
+        analytic Gaussian mechanism (Balle & Wang 2018), which calibrates
+        exactly for every ``ε > 0``.
+
+    .. note::
+
         **The Gaussian scale does NOT depend on the sparsity ``s``.** The
         Laplace branch uses the ``l_1``-sensitivity ``Δ₁ = 2 L √s / n``, which
         carries a ``√s``; the Gaussian branch uses the ``l_2``-sensitivity
@@ -93,7 +107,9 @@ def gaussian_noise_scale(
     n : float
         Dataset size (number of records averaged).
     epsilon : float
-        Target privacy budget ``ε``.
+        Target privacy budget ``ε``. The classical calibration is valid only
+        for ``ε ∈ (0, 1)`` (see note); the caller
+        (:func:`dimma.mechanisms.projection.projection_mechanism`) enforces this.
     delta : float
         Target privacy failure probability ``δ`` (must be ``> 0`` here).
 

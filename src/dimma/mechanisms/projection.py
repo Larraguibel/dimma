@@ -63,6 +63,22 @@ def projection_mechanism(
 
     Privacy comes only from the noise; the projection is post-processing.
 
+    .. note::
+
+        **The Gaussian branch requires ``ε < 1``.**
+        :func:`dimma.accounting.projection.gaussian_noise_scale` returns the
+        classical Dwork–Roth calibration ``σ = √(2 ln(1.25/δ)) · Δ₂ / ε`` (with
+        ``l_2``-sensitivity ``Δ₂ = 2 L / n``). This is faithful to the paper's
+        stated formula (Ghazi et al. 2024, Appendix A, Fact A.1), but the
+        classical bound only certifies ``(ε, δ)``-DP for ``ε ∈ (0, 1)``. For
+        ``ε ≥ 1`` the calibration under-noises, so the release would **not**
+        satisfy ``(ε, δ)``-DP — a silent privacy violation. This branch
+        therefore rejects ``ε ≥ 1`` eagerly rather than emit an under-noised
+        vector. If all-``ε`` Gaussian support is ever needed, adopt the analytic
+        Gaussian mechanism (Balle & Wang 2018), which calibrates exactly for
+        every ``ε > 0``. The Laplace branch (``δ = 0``) has no such restriction
+        and accepts any ``ε > 0``.
+
     Parameters
     ----------
     mean : jax.Array or pytree of jax.Array
@@ -71,7 +87,10 @@ def projection_mechanism(
         parameter pytrees share one code path. This function does **not**
         compute the mean — the caller passes it in.
     epsilon : float
-        Target privacy budget ``ε``. Must be ``> 0``.
+        Target privacy budget ``ε``. Must be ``> 0``. In the **Gaussian branch**
+        (``δ > 0``) it must additionally be ``< 1`` — the classical Dwork–Roth
+        Gaussian calibration is only valid for ``ε ∈ (0, 1)`` (see the note
+        above). The Laplace branch (``δ = 0``) accepts any ``ε > 0``.
     delta : float
         Target failure probability ``δ``. Must be in ``[0, 1)`` (``δ >= 1`` is
         meaningless for DP). ``0.0`` selects the pure-DP Laplace branch; any
@@ -103,13 +122,19 @@ def projection_mechanism(
     Raises
     ------
     ValueError
-        If ``epsilon <= 0``, ``delta`` is outside ``[0, 1)``, ``n < 1``,
-        ``s < 1`` or ``L <= 0``.
+        If ``epsilon <= 0``, ``epsilon >= 1`` in the Gaussian branch
+        (``delta > 0``), ``delta`` is outside ``[0, 1)``, ``n < 1``, ``s < 1``
+        or ``L <= 0``.
     """
     if epsilon <= 0.0:
         raise ValueError(f"epsilon must be > 0, got {epsilon}.")
     if delta < 0.0 or delta >= 1.0:
         raise ValueError(f"delta must be in [0, 1), got {delta}.")
+    if delta > 0.0 and epsilon >= 1.0:
+        raise ValueError(
+            "epsilon must be < 1 in the Gaussian branch (delta > 0), got "
+            f"{epsilon}."
+        )
     if n < 1:
         raise ValueError(f"n must be >= 1, got {n}.")
     if s < 1:
