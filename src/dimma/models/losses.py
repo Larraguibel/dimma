@@ -16,6 +16,18 @@ from dimma.models.mlp import forward
 from dimma.models.hashed_logreg import forward as hashed_forward
 
 
+def _stable_bce(logit: jax.Array, y: jax.Array) -> jax.Array:
+    """Numerically-stable sigmoid BCE, elementwise over ``logit``.
+
+    Evaluates ``max(logit, 0) - logit * y + log1p(exp(-|logit|))``, the
+    overflow-safe form of ``-[y*log σ(logit) + (1-y)*log(1-σ(logit))]``. Single
+    source of truth for the formula shared by the losses below; broadcasts over
+    any ``logit`` shape (scalar for the per-sample losses, batched for
+    :func:`batch_bce_loss`).
+    """
+    return jnp.maximum(logit, 0.0) - logit * y + jnp.log1p(jnp.exp(-jnp.abs(logit)))
+
+
 def per_sample_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
     """Sigmoid BCE loss for a **single** example.
 
@@ -34,7 +46,7 @@ def per_sample_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
         Binary label in {0., 1.}.
     """
     logit = forward(params, x)
-    return jnp.maximum(logit, 0.0) - logit * y + jnp.log1p(jnp.exp(-jnp.abs(logit)))
+    return _stable_bce(logit, y)
 
 
 def per_sample_hashed_bce_loss(
@@ -63,7 +75,7 @@ def per_sample_hashed_bce_loss(
         Binary label in {0., 1.}.
     """
     logit = hashed_forward(params, x)
-    return jnp.maximum(logit, 0.0) - logit * y + jnp.log1p(jnp.exp(-jnp.abs(logit)))
+    return _stable_bce(logit, y)
 
 
 def batch_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
@@ -79,6 +91,4 @@ def batch_bce_loss(params: dict, x: jax.Array, y: jax.Array) -> jax.Array:
         Batch of binary labels.
     """
     logits = forward(params, x)
-    return jnp.mean(
-        jnp.maximum(logits, 0.0) - logits * y + jnp.log1p(jnp.exp(-jnp.abs(logits)))
-    )
+    return jnp.mean(_stable_bce(logits, y))
