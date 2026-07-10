@@ -209,6 +209,35 @@ def test_variation_projection_zero_prev_enforces_l1_ball():
     assert _l1_norm(out.grad_estimate) <= radius + 1e-5
 
 
+# ---------------------------------------------------------------------------
+# Eager validation of the sparsity hyperparameter s (issue #22).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad_s", [0, -1, 2.5, True])
+def test_anchor_step_rejects_invalid_s(bad_s):
+    grad_fn = _make_grad_fn()
+    with pytest.raises(ValueError) as exc:
+        make_anchor_step(grad_fn, s=bad_s)
+    assert "s must be a positive integer or None" in str(exc.value)
+
+
+@pytest.mark.parametrize("bad_s", [0, -1, 2.5, True])
+def test_variation_step_rejects_invalid_s(bad_s):
+    grad_fn = _make_grad_fn()
+    with pytest.raises(ValueError) as exc:
+        make_variation_step(grad_fn, s=bad_s)
+    assert "s must be a positive integer or None" in str(exc.value)
+
+
+@pytest.mark.parametrize("good_s", [None, 1, 4])
+def test_factories_accept_valid_s(good_s):
+    # None and any positive int build a kernel without error.
+    grad_fn = _make_grad_fn()
+    assert callable(make_anchor_step(grad_fn, s=good_s))
+    assert callable(make_variation_step(grad_fn, s=good_s))
+
+
 def test_variation_projection_nonzero_prev_hand_reconstruction():
     from dimma.core.pytree import (
         pytree_add,

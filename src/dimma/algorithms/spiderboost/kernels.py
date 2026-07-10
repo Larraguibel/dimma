@@ -38,6 +38,22 @@ from dimma.core.noise import add_pytree_gaussian_noise
 from dimma.core.projection import project_l1_ball_pytree
 
 
+def _validate_s(s: int | None) -> None:
+    """Eagerly reject an invalid sparsity ``s`` at factory setup time.
+
+    ``s`` is a *static* Python int used compile-time as ``sqrt(s)`` (anchor)
+    and ``sqrt(2 * s)`` (variation), so the guard runs here — outside anything
+    traced — to keep the ``s=None`` program byte-identical. Consistent with the
+    standalone ``projection_mechanism``, which enforces ``s >= 1``. Note that
+    ``isinstance(True, int)`` is ``True`` in Python, so ``bool`` is rejected
+    explicitly: ``s=True`` is not a valid sparsity.
+    """
+    if s is None:
+        return
+    if isinstance(s, bool) or not isinstance(s, int) or s < 1:
+        raise ValueError(f"s must be a positive integer or None, got {s!r}.")
+
+
 class StepOutput(NamedTuple):
     """Return value of one SpiderBoost step.
 
@@ -84,6 +100,7 @@ def make_anchor_step(per_sample_grad_fn, s: int | None = None):
         g_t  ~ N(0, sigma1^2 I)
         ∇_t  = (1 / b1) * sum_{x in S_t} clip(∇f(w_t; x), L0)  +  g_t
     """
+    _validate_s(s)
 
     def anchor_step(params, x_batch, y_batch, mask, b1, L0, sigma1, key):
         per_sample = per_sample_grad_fn(params, x_batch, y_batch)
@@ -158,6 +175,7 @@ def make_variation_step(per_sample_grad_fn, s: int | None = None):
                    clip(∇f(w_t; x) - ∇f(w_{t-1}; x), clip_c)  +  g_t
         ∇_t      = ∇_{t-1} + Δ_t
     """
+    _validate_s(s)
 
     def variation_step(params_t, params_prev, prev_grad_est, x_batch, y_batch,
                        mask, b2, L1, sigma2, sigma2_hat, key):
