@@ -135,6 +135,32 @@ def test_required_arguments():
         train(x, y, _per_sample_loss, config=cfg, noise_scales=_zero_noise())  # type: ignore
 
 
+def test_projection_smoke_s_set():
+    # Sparse-projection path runs end-to-end and yields finite grad norms.
+    x, y = _make_data(n=8, d=6)
+    # Use non-degenerate clipping/noise so projection actually engages.
+    cfg = _base_config()._replace(s=4, L0=1.0, L1=1.0)
+    res = train(x, y, _per_sample_loss, jnp.zeros(6), cfg,
+                NoiseScales(sigma1=0.5, sigma2=0.5, sigma2_hat=0.5),
+                sampler="poisson")
+    assert len(res.history.grad_norm) == cfg.T + 1
+    assert all(math.isfinite(g) for g in res.history.grad_norm)
+
+
+def test_default_field_does_not_perturb_default_path():
+    # Appending TrainConfig.s (default None) must not change the s-off run.
+    x, y = _make_data()
+    cfg_default = _base_config()             # s defaults to None
+    cfg_explicit = _base_config()._replace(s=None)
+    assert cfg_default.s is None
+    r_default = train(x, y, _per_sample_loss, jnp.zeros(2), cfg_default,
+                      _zero_noise())
+    r_explicit = train(x, y, _per_sample_loss, jnp.zeros(2), cfg_explicit,
+                       _zero_noise())
+    assert r_default.history.grad_norm == r_explicit.history.grad_norm
+    assert jnp.array_equal(r_default.params_final, r_explicit.params_final)
+
+
 def test_delta_w_nan_at_anchor_steps():
     x, y = _make_data()
     cfg = _base_config(T=20, q=5)

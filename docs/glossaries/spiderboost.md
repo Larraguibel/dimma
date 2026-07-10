@@ -60,6 +60,9 @@ The entry point for running Private SpiderBoost (`dimma.train`). Takes data, a p
 **`TrainConfig`**
 A dataclass holding all SpiderBoost hyperparameters: ε, δ, L0, L1, T (total phases), q (phase length / sampling rate), b1 (anchor batch size), b2 (variation batch size), η (learning rate), seed.
 
+**`TrainConfig.s`**
+The optional [gradient-sparsity](../../CONTEXT.md#noise-and-clipping) hyperparameter. Default `None`, which disables projection — the kernels run the unmodified SpiderBoost step (bit-exact with the pre-projection implementation). When set to an `int`, the anchor step projects its noisy estimate onto the [ℓ₁-ball](../../CONTEXT.md#noise-and-clipping) of radius `L0·√s`, and each variation step projects the noisy SPIDER increment onto radius `L1·‖Δw‖·√(2s)` (Ghazi et al. 2024, Algorithm 1). This is privacy-free [post-processing](../../CONTEXT.md#privacy-guarantees): the three noise scales and all privacy accounting are UNCHANGED.
+
 **`TrainResult`**
 The output of `train()`: contains `params_final` (the [final iterate](../../CONTEXT.md#training-output)), `params_random` (the [random iterate](../../CONTEXT.md#training-output) — the one carrying the formal (ε, δ)-DP guarantee under Algorithm 2), and `history`.
 

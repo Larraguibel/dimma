@@ -74,6 +74,14 @@ class TrainConfig(NamedTuple):
     margin_sigmas : float
         Safety margin for ``poisson_padded_batch_size``. Defaults to
         the value used in the source implementation (6.0).
+    s : int or None
+        Gradient sparsity for optional ``l_1``-ball projection
+        post-processing in the step kernels. ``None`` (default) disables
+        projection — the kernels run the unmodified SpiderBoost step. When
+        set, the anchor estimate is projected onto ``B_1(0, L0*sqrt(s))``
+        and the variation increment onto ``B_1(0, L1*delta_w*sqrt(2*s))``
+        (Ghazi et al. 2024, Algorithm 1). Projection is post-processing;
+        the privacy accounting (``NoiseScales``) is UNCHANGED.
     """
     epsilon: float
     delta: float
@@ -86,6 +94,7 @@ class TrainConfig(NamedTuple):
     eta: float
     seed: int
     margin_sigmas: float = 6.0
+    s: int | None = None
 
 
 class StepInfo(NamedTuple):
@@ -262,8 +271,8 @@ def train(
         jax.grad(per_sample_loss_fn), in_axes=(None, 0, 0)
     )
 
-    anchor_step_jit = jax.jit(make_anchor_step(per_sample_grad_fn))
-    variation_step_jit = jax.jit(make_variation_step(per_sample_grad_fn))
+    anchor_step_jit = jax.jit(make_anchor_step(per_sample_grad_fn, s=config.s))
+    variation_step_jit = jax.jit(make_variation_step(per_sample_grad_fn, s=config.s))
 
     params = init_params
     params_prev = init_params

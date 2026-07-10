@@ -1,13 +1,15 @@
-"""Gaussian noise injection over JAX pytrees.
+"""Gaussian and Laplace noise injection over JAX pytrees.
 
-``add_pytree_gaussian_noise`` adds independent Gaussian noise of a given
-standard deviation to every leaf of a pytree. The caller is responsible
-for calibrating ``std`` to the mechanism's sensitivity. This module
-makes no DP claims on its own — the privacy cost of a mechanism depends
-on what was clipped before the noise was added, not on this function.
+``add_pytree_gaussian_noise`` and ``add_pytree_laplace_noise`` add
+independent noise of a given scale to every leaf of a pytree. The caller
+is responsible for calibrating the scale to the mechanism's sensitivity.
+This module makes no DP claims on its own — the privacy cost of a
+mechanism depends on what was clipped before the noise was added, not on
+these functions.
 
-Extracted from `private_spider_boost_criteo/src/private_spiderboost.py`
-without modification.
+``add_pytree_gaussian_noise`` is extracted from
+`private_spider_boost_criteo/src/private_spiderboost.py` without
+modification.
 """
 
 from __future__ import annotations
@@ -36,6 +38,38 @@ def add_pytree_gaussian_noise(pytree, key: jax.Array, std: float | jax.Array):
     keys = jax.random.split(key, len(leaves))
     noisy_leaves = [
         leaf + std * jax.random.normal(k, leaf.shape, dtype=leaf.dtype)
+        for leaf, k in zip(leaves, keys)
+    ]
+    return jax.tree_util.tree_unflatten(treedef, noisy_leaves)
+
+
+def add_pytree_laplace_noise(pytree, key: jax.Array, scale: float | jax.Array):
+    """Add iid ``Lap(0, scale)`` noise of matching shape to every leaf.
+
+    ``scale`` is the Laplace ``b`` parameter (the density is proportional to
+    ``exp(-|x| / b)``), **not** the standard deviation. The variance of each
+    coordinate is ``2 * scale ** 2``. The caller is responsible for
+    calibrating ``scale`` to the mechanism's ``l_1`` sensitivity; this
+    function makes no DP claims on its own.
+
+    Parameters
+    ----------
+    pytree : pytree of jax.Array
+        Reference pytree (the noise has the same shapes as its leaves).
+    key : jax.Array
+        PRNG key.
+    scale : float or jax.Array (scalar)
+        Laplace ``b`` parameter (not the standard deviation).
+
+    Returns
+    -------
+    noisy : pytree of jax.Array
+        ``pytree + Laplace noise``.
+    """
+    leaves, treedef = jax.tree_util.tree_flatten(pytree)
+    keys = jax.random.split(key, len(leaves))
+    noisy_leaves = [
+        leaf + scale * jax.random.laplace(k, leaf.shape, dtype=leaf.dtype)
         for leaf, k in zip(leaves, keys)
     ]
     return jax.tree_util.tree_unflatten(treedef, noisy_leaves)
