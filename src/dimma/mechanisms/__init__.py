@@ -17,8 +17,9 @@ The first inhabitant is the projection mechanism of Ghazi et al. (2024),
 Algorithm 1.
 """
 
-from dimma.mechanisms.projection import projection_mechanism
+from dimma.mechanisms.projection import ProjectionOutput, projection_mechanism
 
 __all__ = [
+    "ProjectionOutput",
     "projection_mechanism",
 ]

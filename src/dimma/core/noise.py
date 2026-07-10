@@ -7,14 +7,38 @@ This module makes no DP claims on its own — the privacy cost of a
 mechanism depends on what was clipped before the noise was added, not on
 these functions.
 
-``add_pytree_gaussian_noise`` is extracted from
-`private_spider_boost_criteo/src/private_spiderboost.py` without
-modification.
+The public API and traced behavior of ``add_pytree_gaussian_noise`` are
+preserved exactly from
+`private_spider_boost_criteo/src/private_spiderboost.py` (verified by the
+regression oracle in ``tests/test_regression_against_source.py``); the
+per-leaf sampling is now routed through the shared private helper
+``_add_pytree_noise``.
 """
 
 from __future__ import annotations
 
 import jax
+
+
+def _add_pytree_noise(pytree, key: jax.Array, scale: float | jax.Array, sample_fn):
+    """Add iid noise of matching shape to every leaf via ``sample_fn``.
+
+    ``sample_fn`` is a ``jax.random`` sampler ``(key, shape, dtype) -> array``
+    (e.g. ``jax.random.normal`` or ``jax.random.laplace``). The traced program
+    is identical to inlining the sampler: same key split, same per-leaf
+    ``leaf + scale * sample_fn(k, leaf.shape, dtype=leaf.dtype)`` in the same
+    order. Shared by the two public wrappers below.
+    """
+    # The module docstring's provenance claim was updated when this helper was
+    # extracted (#25): the traced program is unchanged (same key splits, same
+    # ops), enforced by tests/test_regression_against_source.py.
+    leaves, treedef = jax.tree_util.tree_flatten(pytree)
+    keys = jax.random.split(key, len(leaves))
+    noisy_leaves = [
+        leaf + scale * sample_fn(k, leaf.shape, dtype=leaf.dtype)
+        for leaf, k in zip(leaves, keys)
+    ]
+    return jax.tree_util.tree_unflatten(treedef, noisy_leaves)
 
 
 def add_pytree_gaussian_noise(pytree, key: jax.Array, std: float | jax.Array):
@@ -34,13 +58,7 @@ def add_pytree_gaussian_noise(pytree, key: jax.Array, std: float | jax.Array):
     noisy : pytree of jax.Array
         ``pytree + Gaussian noise``.
     """
-    leaves, treedef = jax.tree_util.tree_flatten(pytree)
-    keys = jax.random.split(key, len(leaves))
-    noisy_leaves = [
-        leaf + std * jax.random.normal(k, leaf.shape, dtype=leaf.dtype)
-        for leaf, k in zip(leaves, keys)
-    ]
-    return jax.tree_util.tree_unflatten(treedef, noisy_leaves)
+    return _add_pytree_noise(pytree, key, std, jax.random.normal)
 
 
 def add_pytree_laplace_noise(pytree, key: jax.Array, scale: float | jax.Array):
@@ -66,10 +84,4 @@ def add_pytree_laplace_noise(pytree, key: jax.Array, scale: float | jax.Array):
     noisy : pytree of jax.Array
         ``pytree + Laplace noise``.
     """
-    leaves, treedef = jax.tree_util.tree_flatten(pytree)
-    keys = jax.random.split(key, len(leaves))
-    noisy_leaves = [
-        leaf + scale * jax.random.laplace(k, leaf.shape, dtype=leaf.dtype)
-        for leaf, k in zip(leaves, keys)
-    ]
-    return jax.tree_util.tree_unflatten(treedef, noisy_leaves)
+    return _add_pytree_noise(pytree, key, scale, jax.random.laplace)

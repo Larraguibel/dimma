@@ -23,6 +23,9 @@ Optimization with Sparse Gradients"*, NeurIPS 2024, Section 3.
 from __future__ import annotations
 
 import math
+from typing import Any, NamedTuple
+
+import jax
 
 from dimma.accounting.projection import (
     gaussian_noise_scale,
@@ -35,6 +38,25 @@ from dimma.core.noise import (
 from dimma.core.projection import project_l1_ball_pytree
 
 
+class ProjectionOutput(NamedTuple):
+    """Return value of :func:`projection_mechanism`.
+
+    Attributes
+    ----------
+    zhat : pytree
+        The private, feasible estimate ``ẑ`` (satisfies ``‖ẑ‖_1 <= L√s``);
+        this is the released quantity. Same structure as the input ``mean``.
+    z_tilde : pytree
+        The pre-projection noisy vector ``z̃`` (same structure as ``mean``),
+        from which the noise ``ξ = z̃ − mean`` can be recovered (needed by the
+        Lemma 3.1 tests and the demo notebook) without re-deriving the RNG
+        internals.
+    """
+
+    zhat: Any
+    z_tilde: Any
+
+
 def projection_mechanism(
     mean,
     *,
@@ -43,9 +65,8 @@ def projection_mechanism(
     n: float,
     L: float,
     s: float,
-    key,
-    return_noisy: bool = False,
-):
+    key: jax.Array,
+) -> ProjectionOutput:
     """Privatise an empirical mean via perturb-then-project (Algorithm 1).
 
     Adds calibrated coordinate-wise noise to ``mean`` and projects the result
@@ -63,6 +84,22 @@ def projection_mechanism(
 
     Privacy comes only from the noise; the projection is post-processing.
 
+    .. note::
+
+        **The Gaussian branch requires ``ε < 1``.**
+        :func:`dimma.accounting.projection.gaussian_noise_scale` returns the
+        classical Dwork–Roth calibration ``σ = √(2 ln(1.25/δ)) · Δ₂ / ε`` (with
+        ``l_2``-sensitivity ``Δ₂ = 2 L / n``). This is faithful to the paper's
+        stated formula (Ghazi et al. 2024, Appendix A, Fact A.1), but the
+        classical bound only certifies ``(ε, δ)``-DP for ``ε ∈ (0, 1)``. For
+        ``ε ≥ 1`` the calibration under-noises, so the release would **not**
+        satisfy ``(ε, δ)``-DP — a silent privacy violation. This branch
+        therefore rejects ``ε ≥ 1`` eagerly rather than emit an under-noised
+        vector. If all-``ε`` Gaussian support is ever needed, adopt the analytic
+        Gaussian mechanism (Balle & Wang 2018), which calibrates exactly for
+        every ``ε > 0``. The Laplace branch (``δ = 0``) has no such restriction
+        and accepts any ``ε > 0``.
+
     Parameters
     ----------
     mean : jax.Array or pytree of jax.Array
@@ -71,10 +108,14 @@ def projection_mechanism(
         parameter pytrees share one code path. This function does **not**
         compute the mean — the caller passes it in.
     epsilon : float
-        Target privacy budget ``ε``. Must be ``> 0``.
+        Target privacy budget ``ε``. Must be ``> 0``. In the **Gaussian branch**
+        (``δ > 0``) it must additionally be ``< 1`` — the classical Dwork–Roth
+        Gaussian calibration is only valid for ``ε ∈ (0, 1)`` (see the note
+        above). The Laplace branch (``δ = 0``) accepts any ``ε > 0``.
     delta : float
-        Target failure probability ``δ``. Must be ``>= 0``. ``0.0`` selects the
-        pure-DP Laplace branch; any positive value selects the Gaussian branch.
+        Target failure probability ``δ``. Must be in ``[0, 1)`` (``δ >= 1`` is
+        meaningless for DP). ``0.0`` selects the pure-DP Laplace branch; any
+        value in ``(0, 1)`` selects the Gaussian branch.
     n : float
         Dataset size the mean was averaged over. Must be ``>= 1``.
     L : float
@@ -84,30 +125,31 @@ def projection_mechanism(
         ``L√s`` and, in the Laplace branch, the noise scale. Must be ``>= 1``.
     key : jax.Array
         PRNG key for the noise draw.
-    return_noisy : bool, default ``False``
-        If ``True``, also return the pre-projection noisy vector ``z̃`` so the
-        caller can recover the noise ``ξ = z̃ − mean`` (needed by the Lemma 3.1
-        tests and the demo notebook) without re-deriving the RNG internals.
 
     Returns
     -------
-    zhat : same structure as ``mean``
-        The private, feasible estimate ``ẑ`` (satisfies ``‖ẑ‖_1 <= L√s``).
-        Returned alone when ``return_noisy`` is ``False``.
-    (zhat, z_tilde) : tuple
-        When ``return_noisy`` is ``True``, the pair of the projected estimate
-        ``ẑ`` and the pre-projection noisy vector ``z̃`` (same structure as
-        ``mean``).
+    ProjectionOutput
+        A ``(zhat, z_tilde)`` named tuple: the private, feasible estimate ``ẑ``
+        (satisfies ``‖ẑ‖_1 <= L√s``) and the pre-projection noisy vector ``z̃``
+        (both the same structure as ``mean``). The noise is recoverable as
+        ``ξ = z_tilde − mean``.
 
     Raises
     ------
     ValueError
-        If ``epsilon <= 0``, ``delta < 0``, ``n < 1``, ``s < 1`` or ``L <= 0``.
+        If ``epsilon <= 0``, ``epsilon >= 1`` in the Gaussian branch
+        (``delta > 0``), ``delta`` is outside ``[0, 1)``, ``n < 1``, ``s < 1``
+        or ``L <= 0``.
     """
     if epsilon <= 0.0:
         raise ValueError(f"epsilon must be > 0, got {epsilon}.")
-    if delta < 0.0:
-        raise ValueError(f"delta must be >= 0, got {delta}.")
+    if delta < 0.0 or delta >= 1.0:
+        raise ValueError(f"delta must be in [0, 1), got {delta}.")
+    if delta > 0.0 and epsilon >= 1.0:
+        raise ValueError(
+            "epsilon must be < 1 in the Gaussian branch (delta > 0), got "
+            f"{epsilon}."
+        )
     if n < 1:
         raise ValueError(f"n must be >= 1, got {n}.")
     if s < 1:
@@ -125,6 +167,4 @@ def projection_mechanism(
     radius = L * math.sqrt(s)
     zhat = project_l1_ball_pytree(z_tilde, radius)
 
-    if return_noisy:
-        return zhat, z_tilde
-    return zhat
+    return ProjectionOutput(zhat, z_tilde)

@@ -161,6 +161,16 @@ def test_default_field_does_not_perturb_default_path():
     assert jnp.array_equal(r_default.params_final, r_explicit.params_final)
 
 
+@pytest.mark.parametrize("bad_s", [0, -1, 2.5, True])
+def test_train_rejects_invalid_s(bad_s):
+    # config.s flows into the step factories, which validate eagerly (issue #22).
+    x, y = _make_data()
+    cfg = _base_config()._replace(s=bad_s)
+    with pytest.raises(ValueError) as exc:
+        train(x, y, _per_sample_loss, jnp.zeros(2), cfg, _zero_noise())
+    assert "s must be a positive integer or None" in str(exc.value)
+
+
 def test_delta_w_nan_at_anchor_steps():
     x, y = _make_data()
     cfg = _base_config(T=20, q=5)

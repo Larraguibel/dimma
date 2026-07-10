@@ -48,6 +48,11 @@ import jax.numpy as jnp
 import numpy as np
 
 
+# Standard deviation of the Gaussian used to initialise the weight table and
+# dense weights (small so the initial logits stay near zero).
+_INIT_STD = 0.01
+
+
 # ---------------------------------------------------------------------------
 # Preprocessing helper (dataset-agnostic, NumPy)
 # ---------------------------------------------------------------------------
@@ -85,9 +90,32 @@ def hash_buckets(ids, num_buckets: int) -> np.ndarray:
         already arrive as ``float32`` (see ``datasets/criteo.py``); that upstream
         cast is lossy for very large source IDs, adding a few extra hash
         collisions — harmless for this reference model.
+
+    Raises
+    ------
+    ValueError
+        If ``num_fields * num_buckets > 2**24``, since the largest global
+        index would then exceed the float32-exact range and the cast would
+        alias buckets silently. Enforced eagerly on the NumPy side.
     """
     ids = np.asarray(ids)
     num_fields = ids.shape[-1]
+
+    # The float32 pack is exact only for indices <= 2**24 (float32 has a
+    # 24-bit mantissa). The largest global index is
+    # (num_fields - 1) * num_buckets + (num_buckets - 1) = num_fields*num_buckets - 1,
+    # so requiring num_fields * num_buckets <= 2**24 keeps every index exact.
+    # Beyond that the cast silently aliases buckets into wrong slots and the
+    # gathered gradients are plausible-but-wrong — fail eagerly instead.
+    max_index_count = num_fields * int(num_buckets)
+    if max_index_count > 2**24:
+        raise ValueError(
+            f"num_fields * num_buckets = {num_fields} * {int(num_buckets)} = "
+            f"{max_index_count} exceeds 2**24 = {2**24}; float32 bucket "
+            "indices would alias silently. Reduce num_buckets (or num_fields) "
+            "so the table has at most 2**24 slots."
+        )
+
     offsets = np.arange(num_fields, dtype=np.int64) * int(num_buckets)
     buckets = (ids.astype(np.int64) % int(num_buckets)) + offsets
     return buckets.astype(np.float32)
@@ -121,8 +149,8 @@ def init_params(
         Number of buckets per categorical field.
     """
     k_table, k_dense = jax.random.split(key)
-    table = jax.random.normal(k_table, (num_fields * num_buckets,)) * 0.01
-    w_dense = jax.random.normal(k_dense, (num_dense,)) * 0.01
+    table = jax.random.normal(k_table, (num_fields * num_buckets,)) * _INIT_STD
+    w_dense = jax.random.normal(k_dense, (num_dense,)) * _INIT_STD
     b = jnp.array(0.0)
     return {"table": table, "w_dense": w_dense, "b": b}
 
