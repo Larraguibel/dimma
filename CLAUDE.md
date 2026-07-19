@@ -60,7 +60,7 @@ See `docs/agents/issue-tracker.md`.
 See `docs/agents/triage-labels.md`.
 
 ### Domain docs
-Single-context layout — one `CONTEXT.md` at the repo root plus `docs/adr/` for architectural decisions.
+Single-context, core + per-algorithm glossary layout — a universal `CONTEXT.md` at the repo root, per-algorithm glossaries under `docs/glossaries/<algo>.md`, plus `docs/adr/` for architectural decisions.
 See `docs/agents/domain.md`.
 
 ## Architecture decisions
