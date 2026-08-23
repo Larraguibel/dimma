@@ -1,5 +1,9 @@
 # DP-SGD Projects
 
+!!! warning
+
+    **This project and its documentation are deprecated.** They are superseded by [dimma_lib](https://github.com/Larraguibel/dimma_lib) ([documentation](https://larraguibel.github.io/dimma_lib/)), a deliberate re-cut in which every algorithm is assembled from the same seven-stage pipeline. The algorithm pages here describe the deprecated implementation.
+
 This section documents a research effort to implement and empirically evaluate differentially private optimization algorithms that go beyond the standard DP-SGD pipeline. It covers the conceptual foundations of DP training (subsampling, sensitivity, accounting), the JAX/Flax/Optax primitives needed to build non-standard variants, and dimma — a small JAX library that codifies those primitives into a model- and dataset-agnostic framework. The first algorithm implemented is Private SpiderBoost, which alternates between anchor and variation steps with two distinct noise scales; its page documents both the implementation and the gaps between the paper and the code. The section is written for people who know DP-SGD theory and are expanding into practice, or who know JAX and are expanding into DP.
 
 - [Differential Privacy for SGD: Overview](overview.md)
